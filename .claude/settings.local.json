@@ -8,7 +8,10 @@
       "Bash(dotnet build)",
       "Bash(dotnet ef database:*)",
       "Bash(dotnet run:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(dotnet add reference:*)",
+      "Bash(dotnet test)",
+      "Bash(del Services*.cs)"
     ],
     "deny": [],
     "ask": []

@@ -244,10 +244,10 @@ Expert: 5-6 cores, 6-7 tubos, 5-15 bolinhas por cor
 - [x] Detecção de vitória/derrota
 
 ### Sprint 4 (1 semana) - Polimento
-- [ ] Efeitos visuais e sonoros
-- [ ] Temas e customização
-- [ ] Otimizações de performance
-- [ ] Testes unitários
+- [x] Efeitos visuais e sonoros
+- [x] Temas e customização
+- [x] Otimizações de performance
+- [x] Testes unitários
 
 ### Sprint 5 (1 semana) - Recursos Sociais
 - [ ] Sistema de perfil básico

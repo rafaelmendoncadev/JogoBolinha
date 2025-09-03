@@ -67,7 +67,7 @@
 
     <!-- Game Controls -->
     <div class="game-controls">
-        <button class="btn btn-secondary" id="restart-btn">
+        <button class="btn btn-secondary btn-effect" id="restart-btn">
             <i class="fas fa-redo"></i> Reiniciar
         </button>
         <button class="btn btn-warning" id="hint-btn" @(Model.RemainingHints <= 0 ? "disabled" : "") title="Mostra um movimento simples">
@@ -88,9 +88,23 @@
         <button class="btn btn-outline-primary" id="undo-multiple-btn" @(!Model.CanUndo ? "disabled" : "")>
             <i class="fas fa-undo"></i> Desfazer 3x
         </button>
-        <button class="btn btn-success" id="score-breakdown-btn">
+        <button class="btn btn-success btn-effect" id="score-breakdown-btn">
             <i class="fas fa-chart-bar"></i> Pontuação
         </button>
+        <button class="btn btn-outline-secondary btn-effect" id="sound-toggle-btn" title="Ativar/Desativar sons">
+            <i id="sound-icon" class="fas fa-volume-up"></i>
+        </button>
+        <button class="btn btn-outline-secondary btn-effect" id="effects-toggle-btn" title="Ativar/Desativar efeitos visuais">
+            <i id="effects-icon" class="fas fa-magic"></i>
+        </button>
+    </div>
+    
+    <!-- Theme Selector -->
+    <div class="text-center mt-3">
+        <div class="d-inline-block">
+            <small class="text-muted">Temas:</small>
+            <div id="game-theme-selector"></div>
+        </div>
     </div>
     
     <!-- Message Container for Hint Explanations -->
@@ -205,6 +219,9 @@
 </div>
 
 @section Scripts {
+    <!-- Temporarily disabled to prevent hanging -->
+    <script src="~/js/game-effects.js"></script>
+    <!-- <script src="~/js/theme-manager.js"></script> -->
     <script>
         const gameStateId = @Model.GameState.Id;
         let selectedTube = null;
@@ -212,8 +229,15 @@
         let gameTimer;
 
         $(document).ready(function() {
-            initializeGame();
-            startTimer();
+            try {
+                initializeGame();
+                startTimer();
+                // Temporarily disable complex features to prevent hanging
+                initializeEffectsControls();
+                // initializeThemeSelector();
+            } catch (error) {
+                console.error('Initialization error:', error);
+            }
         });
 
         function initializeGame() {
@@ -250,6 +274,55 @@
             $('#score-breakdown-btn').on('click', showScoreBreakdown);
             $('#restart-victory-btn').on('click', restartGame);
             $('#restart-lost-btn').on('click', restartGame);
+        }
+        
+        function initializeEffectsControls() {
+            // Sound toggle
+            $('#sound-toggle-btn').on('click', function() {
+                if (window.gameEffects) {
+                    const soundEnabled = gameEffects.toggleSound();
+                    const icon = $('#sound-icon');
+                    icon.removeClass('fa-volume-up fa-volume-mute');
+                    icon.addClass(soundEnabled ? 'fa-volume-up' : 'fa-volume-mute');
+                    $(this).toggleClass('active', soundEnabled);
+                }
+            });
+            
+            // Effects toggle
+            $('#effects-toggle-btn').on('click', function() {
+                if (window.gameEffects) {
+                    const effectsEnabled = gameEffects.toggleEffects();
+                    const icon = $('#effects-icon');
+                    $(this).toggleClass('active', effectsEnabled);
+                    if (!effectsEnabled) {
+                        icon.addClass('text-muted');
+                    } else {
+                        icon.removeClass('text-muted');
+                    }
+                }
+            });
+            
+            // Initialize button states
+            if (window.gameEffects) {
+                const soundBtn = $('#sound-toggle-btn');
+                const effectsBtn = $('#effects-toggle-btn');
+                
+                soundBtn.toggleClass('active', gameEffects.soundEnabled);
+                effectsBtn.toggleClass('active', gameEffects.effectsEnabled);
+                
+                if (!gameEffects.soundEnabled) {
+                    $('#sound-icon').removeClass('fa-volume-up').addClass('fa-volume-mute');
+                }
+                if (!gameEffects.effectsEnabled) {
+                    $('#effects-icon').addClass('text-muted');
+                }
+            }
+        }
+        
+        function initializeThemeSelector() {
+            if (window.themeManager) {
+                themeManager.attachThemeSelector('#game-theme-selector');
+            }
         }
 
         function handleTubeClick(tubeId) {
@@ -335,6 +408,11 @@
                         isMoving = false;
                     });
                 } else {
+                    // Play error sound for invalid moves
+                    if (window.gameEffects) {
+                        gameEffects.playErrorSound();
+                    }
+                    
                     showMessage(response.message, 'error');
                     isMoving = false;
                 }
@@ -355,7 +433,7 @@
                 return;
             }
 
-            // Create floating ball for animation
+            // Simplified animation without complex effects to avoid hangs
             const ballClone = ball.clone();
             ballClone.addClass('moving-ball');
             ballClone.css({
@@ -368,15 +446,22 @@
             $('body').append(ballClone);
             ball.hide();
 
-            // Animate to destination
             const targetPosition = toTube.find('.tube-body').offset();
-            targetPosition.top += toTube.find('.ball').length * 35; // Stack height
+            targetPosition.top += toTube.find('.ball').length * 35;
             
             ballClone.animate({
                 top: targetPosition.top,
                 left: targetPosition.left
             }, 300, function() {
                 ballClone.remove();
+                ball.show();
+                
+                // Play move sound
+                if (window.gameEffects) {
+                    const ballColor = ball.css('background-color');
+                    setTimeout(() => gameEffects.playMoveSound(ballColor), 100);
+                }
+                
                 callback();
             });
         }
@@ -432,6 +517,11 @@
             $.post('@Url.Action("UndoMove", "Game")', { gameStateId: gameStateId })
             .done(function(response) {
                 if (response.success) {
+                    // Play undo sound
+                    if (window.gameEffects) {
+                        gameEffects.playUndoSound();
+                    }
+                    
                     updateGameState(response);
                     updateTubesDisplay(response.tubes);
                     showMessage('Movimento desfeito!', 'success');
@@ -453,6 +543,11 @@
             })
             .done(function(response) {
                 if (response.success) {
+                    // Play hint sound
+                    if (window.gameEffects) {
+                        gameEffects.playHintSound();
+                    }
+                    
                     highlightHint(response.hint, response.type, response.explanation);
                     
                     // Show hint explanation if available
@@ -600,6 +695,12 @@
             console.log('gameData:', gameData);
             
             clearInterval(gameTimer);
+            
+            // Play victory sound
+            if (window.gameEffects) {
+                gameEffects.playVictorySound();
+            }
+            
             loadScoreBreakdownForVictory();
             
             // Add extra info from game data
@@ -826,6 +927,7 @@
             margin: 0 auto;
             padding: 20px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            contain: layout style paint;
         }
 
         .game-header {
@@ -884,8 +986,10 @@
         .tube {
             width: 80px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform 0.3s ease;
             position: relative;
+            will-change: transform;
+            transform: translateZ(0);
         }
 
         .tube:hover {
@@ -998,8 +1102,10 @@
             border: 2px solid rgba(0,0,0,0.2);
             box-shadow: 0 2px 5px rgba(0,0,0,0.2), inset 0 1px 3px rgba(255,255,255,0.3);
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
             position: relative;
+            will-change: transform;
+            backface-visibility: hidden;
         }
 
         .ball:hover {

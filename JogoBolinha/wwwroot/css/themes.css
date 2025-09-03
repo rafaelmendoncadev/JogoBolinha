@@ -1,0 +1,310 @@
+/* Ball Sort Puzzle - Theme System */
+
+/* Base theme variables */
+:root {
+    /* Classic Theme (default) */
+    --primary-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --game-area-bg: #f8f9fa;
+    --tube-bg: linear-gradient(to bottom, #ffffff, #f0f0f0);
+    --tube-border: #333;
+    --text-primary: #333;
+    --text-secondary: #666;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    
+    /* Ball colors */
+    --ball-red: #ff6b6b;
+    --ball-cyan: #4ecdc4;
+    --ball-blue: #45b7d1;
+    --ball-green: #96ceb4;
+    --ball-yellow: #ffeaa7;
+    --ball-orange: #fab1a0;
+    --ball-purple: #6c5ce7;
+    --ball-pink: #fd79a8;
+    --ball-teal: #00b894;
+    --ball-brown: #e17055;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+    --primary-bg: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    --game-area-bg: #2c3e50;
+    --tube-bg: linear-gradient(to bottom, #34495e, #2c3e50);
+    --tube-border: #ecf0f1;
+    --text-primary: #ecf0f1;
+    --text-secondary: #bdc3c7;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --info-color: #3498db;
+    
+    /* Enhanced ball colors for dark theme */
+    --ball-red: #e74c3c;
+    --ball-cyan: #1abc9c;
+    --ball-blue: #3498db;
+    --ball-green: #2ecc71;
+    --ball-yellow: #f1c40f;
+    --ball-orange: #e67e22;
+    --ball-purple: #9b59b6;
+    --ball-pink: #e91e63;
+    --ball-teal: #16a085;
+    --ball-brown: #d35400;
+}
+
+/* Neon Theme */
+[data-theme="neon"] {
+    --primary-bg: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%);
+    --game-area-bg: #16213e;
+    --tube-bg: linear-gradient(to bottom, #0f3460, #16213e);
+    --tube-border: #00ffff;
+    --text-primary: #00ffff;
+    --text-secondary: #00bcd4;
+    --success-color: #00ff41;
+    --warning-color: #ffff00;
+    --danger-color: #ff073a;
+    --info-color: #00bcd4;
+    
+    /* Neon ball colors */
+    --ball-red: #ff073a;
+    --ball-cyan: #00ffff;
+    --ball-blue: #0080ff;
+    --ball-green: #00ff41;
+    --ball-yellow: #ffff00;
+    --ball-orange: #ff8c00;
+    --ball-purple: #bf00ff;
+    --ball-pink: #ff1493;
+    --ball-teal: #40e0d0;
+    --ball-brown: #cd853f;
+}
+
+/* Nature Theme */
+[data-theme="nature"] {
+    --primary-bg: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+    --game-area-bg: #f1f8e9;
+    --tube-bg: linear-gradient(to bottom, #ffffff, #e8f5e8);
+    --tube-border: #4a7c59;
+    --text-primary: #2e7d32;
+    --text-secondary: #388e3c;
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --danger-color: #f44336;
+    --info-color: #00bcd4;
+    
+    /* Nature-inspired ball colors */
+    --ball-red: #d32f2f;
+    --ball-cyan: #006064;
+    --ball-blue: #1976d2;
+    --ball-green: #388e3c;
+    --ball-yellow: #fbc02d;
+    --ball-orange: #f57c00;
+    --ball-purple: #7b1fa2;
+    --ball-pink: #c2185b;
+    --ball-teal: #00695c;
+    --ball-brown: #5d4037;
+}
+
+/* Ocean Theme */
+[data-theme="ocean"] {
+    --primary-bg: linear-gradient(135deg, #0c4a6e 0%, #0e7490 100%);
+    --game-area-bg: #e0f7fa;
+    --tube-bg: linear-gradient(to bottom, #ffffff, #b2ebf2);
+    --tube-border: #00695c;
+    --text-primary: #00695c;
+    --text-secondary: #00838f;
+    --success-color: #00796b;
+    --warning-color: #ff8f00;
+    --danger-color: #d84315;
+    --info-color: #0277bd;
+    
+    /* Ocean-inspired ball colors */
+    --ball-red: #d84315;
+    --ball-cyan: #00acc1;
+    --ball-blue: #0277bd;
+    --ball-green: #00695c;
+    --ball-yellow: #ffb300;
+    --ball-orange: #ff8f00;
+    --ball-purple: #7b1fa2;
+    --ball-pink: #ad1457;
+    --ball-teal: #00838f;
+    --ball-brown: #6d4c41;
+}
+
+/* Apply theme variables to components */
+.game-header {
+    background: var(--primary-bg);
+    color: var(--text-primary);
+}
+
+.game-area {
+    background: var(--game-area-bg);
+    color: var(--text-primary);
+}
+
+.tube-body {
+    background: var(--tube-bg);
+    border-color: var(--tube-border);
+}
+
+.info-item .label {
+    color: var(--text-secondary);
+}
+
+.info-item .value {
+    color: var(--text-primary);
+}
+
+/* Theme-specific ball colors */
+[data-color="#ff6b6b"], [style*="background-color: #ff6b6b"] { 
+    background-color: var(--ball-red) !important; 
+}
+[data-color="#4ecdc4"], [style*="background-color: #4ecdc4"] { 
+    background-color: var(--ball-cyan) !important; 
+}
+[data-color="#45b7d1"], [style*="background-color: #45b7d1"] { 
+    background-color: var(--ball-blue) !important; 
+}
+[data-color="#96ceb4"], [style*="background-color: #96ceb4"] { 
+    background-color: var(--ball-green) !important; 
+}
+[data-color="#ffeaa7"], [style*="background-color: #ffeaa7"] { 
+    background-color: var(--ball-yellow) !important; 
+}
+[data-color="#fab1a0"], [style*="background-color: #fab1a0"] { 
+    background-color: var(--ball-orange) !important; 
+}
+[data-color="#6c5ce7"], [style*="background-color: #6c5ce7"] { 
+    background-color: var(--ball-purple) !important; 
+}
+[data-color="#fd79a8"], [style*="background-color: #fd79a8"] { 
+    background-color: var(--ball-pink) !important; 
+}
+[data-color="#00b894"], [style*="background-color: #00b894"] { 
+    background-color: var(--ball-teal) !important; 
+}
+[data-color="#e17055"], [style*="background-color: #e17055"] { 
+    background-color: var(--ball-brown) !important; 
+}
+
+/* Theme-specific enhancements */
+[data-theme="neon"] .tube {
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
+}
+
+[data-theme="neon"] .tube:hover {
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
+}
+
+[data-theme="neon"] .ball {
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2), inset 0 1px 3px rgba(255,255,255,0.3);
+}
+
+[data-theme="neon"] .game-header {
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+}
+
+[data-theme="dark"] .tube-body {
+    box-shadow: inset 0 -5px 10px rgba(255,255,255,0.05);
+}
+
+[data-theme="nature"] .ball {
+    box-shadow: 0 2px 5px rgba(46, 125, 50, 0.3), inset 0 1px 3px rgba(255,255,255,0.3);
+}
+
+[data-theme="ocean"] .tube {
+    border-radius: 15px;
+}
+
+[data-theme="ocean"] .tube-body {
+    border-radius: 0 0 15px 15px;
+    box-shadow: inset 0 -5px 10px rgba(0, 105, 92, 0.1);
+}
+
+/* Theme selector styles */
+.theme-selector {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.theme-option {
+    width: 60px;
+    height: 60px;
+    border: 3px solid transparent;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-option:hover {
+    transform: scale(1.1);
+}
+
+.theme-option.active {
+    border-color: var(--info-color);
+    transform: scale(1.2);
+}
+
+.theme-classic {
+    background: linear-gradient(45deg, #667eea, #764ba2, #f8f9fa, #ffffff);
+}
+
+.theme-dark {
+    background: linear-gradient(45deg, #2c3e50, #34495e, #3498db, #ecf0f1);
+}
+
+.theme-neon {
+    background: linear-gradient(45deg, #0f0f23, #00ffff, #00ff41, #ff073a);
+}
+
+.theme-nature {
+    background: linear-gradient(45deg, #56ab2f, #a8e6cf, #388e3c, #4caf50);
+}
+
+.theme-ocean {
+    background: linear-gradient(45deg, #0c4a6e, #0e7490, #00acc1, #e0f7fa);
+}
+
+/* Responsive theme selector */
+@media (max-width: 768px) {
+    .theme-selector {
+        gap: 8px;
+    }
+    
+    .theme-option {
+        width: 45px;
+        height: 45px;
+    }
+}
+
+/* Animation for theme transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Theme-specific modal styles */
+[data-theme="dark"] .modal-content {
+    background-color: #34495e;
+    color: #ecf0f1;
+}
+
+[data-theme="neon"] .modal-content {
+    background-color: #16213e;
+    color: #00ffff;
+    box-shadow: 0 0 30px rgba(0, 255, 255, 0.3);
+}
+
+[data-theme="nature"] .modal-content {
+    background-color: #f1f8e9;
+    color: #2e7d32;
+}
+
+[data-theme="ocean"] .modal-content {
+    background-color: #e0f7fa;
+    color: #00695c;
+}
