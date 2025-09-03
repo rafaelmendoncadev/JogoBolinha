@@ -17,7 +17,7 @@ namespace JogoBolinha.Models.Game
         
         public bool IsEmpty => !Balls.Any();
         public bool IsFull => Balls.Count >= Capacity;
-        public bool IsComplete => Balls.Count == Capacity && Balls.All(b => b.Color == Balls.First().Color);
+        public bool IsComplete => Balls.Count > 0 && Balls.All(b => b.Color == Balls.First().Color);
         
         public Ball? GetTopBall() => Balls.OrderByDescending(b => b.Position).FirstOrDefault();
         public string? GetTopBallColor() => GetTopBall()?.Color;

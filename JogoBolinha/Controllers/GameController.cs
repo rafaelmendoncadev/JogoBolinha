@@ -14,14 +14,21 @@ namespace JogoBolinha.Controllers
         private readonly GameLogicService _gameLogicService;
         private readonly LevelGeneratorService _levelGeneratorService;
         private readonly ScoreCalculationService _scoreCalculationService;
+        private readonly GameSessionService _gameSessionService;
+        private readonly HintService _hintService;
+        private readonly GameStateManager _gameStateManager;
 
         public GameController(GameDbContext context, GameLogicService gameLogicService, 
-            LevelGeneratorService levelGeneratorService, ScoreCalculationService scoreCalculationService)
+            LevelGeneratorService levelGeneratorService, ScoreCalculationService scoreCalculationService,
+            GameSessionService gameSessionService, HintService hintService, GameStateManager gameStateManager)
         {
             _context = context;
             _gameLogicService = gameLogicService;
             _levelGeneratorService = levelGeneratorService;
             _scoreCalculationService = scoreCalculationService;
+            _gameSessionService = gameSessionService;
+            _hintService = hintService;
+            _gameStateManager = gameStateManager;
         }
 
         public async Task<IActionResult> Index()
@@ -70,12 +77,26 @@ namespace JogoBolinha.Controllers
                 return Json(new { success = false, message = "Movimento inválido" });
             }
 
+            // Check game state after move
+            var stateCheck = await _gameStateManager.CheckGameStateAsync(gameStateId);
+            
+            // Get updated game state
             var gameState = await _context.GameStates
                 .Include(gs => gs.Level)
                 .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
                 .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
 
-            var isWon = _gameLogicService.IsGameWon(gameState!);
+            // If game ended, complete the session
+            if (stateCheck.IsGameOver && stateCheck.IsWon && gameState!.Score == 0)
+            {
+                await _gameSessionService.CompleteGameSessionAsync(gameStateId, true);
+                
+                // Refresh game state to get updated score
+                gameState = await _context.GameStates
+                    .Include(gs => gs.Level)
+                    .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
+                    .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+            }
             
             var result = new
             {
@@ -92,7 +113,10 @@ namespace JogoBolinha.Controllers
                     movesCount = gameState!.MovesCount,
                     score = gameState.Score,
                     status = gameState.Status.ToString(),
-                    isWon = isWon
+                    isWon = stateCheck.IsWon,
+                    isGameOver = stateCheck.IsGameOver,
+                    endReason = stateCheck.EndReason.ToString(),
+                    message = stateCheck.Message
                 },
                 tubes = gameState.Tubes.Select(t => new
                 {
@@ -151,16 +175,168 @@ namespace JogoBolinha.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> GetHint(int gameStateId, bool isAdvanced = false)
+        public async Task<IActionResult> GetHint(int gameStateId, string hintType = "simple")
         {
-            var hint = await _gameLogicService.GetHintAsync(gameStateId, isAdvanced);
+            var type = hintType.ToLower() switch
+            {
+                "advanced" => HintType.Advanced,
+                "strategic" => HintType.Strategic,
+                "tutorial" => HintType.Tutorial,
+                _ => HintType.Simple
+            };
+
+            var hintResult = await _hintService.GetHintAsync(gameStateId, type);
             
-            if (hint == null || !hint.Any())
+            if (hintResult == null || !hintResult.TubeIds.Any())
             {
                 return Json(new { success = false, message = "Nenhuma dica disponível" });
             }
 
-            return Json(new { success = true, hint = hint });
+            return Json(new 
+            { 
+                success = true, 
+                hint = hintResult.TubeIds, 
+                explanation = hintResult.Explanation,
+                score = hintResult.Score,
+                type = hintResult.Type.ToString()
+            });
+        }
+        
+        [HttpPost]
+        public async Task<IActionResult> UndoMultipleMoves(int gameStateId, int movesToUndo = 1)
+        {
+            var success = await _gameLogicService.UndoMultipleMovesAsync(gameStateId, movesToUndo);
+            
+            if (!success)
+            {
+                return Json(new { success = false, message = "Não é possível desfazer os movimentos" });
+            }
+
+            var gameState = await _context.GameStates
+                .Include(gs => gs.Level)
+                .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
+                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+
+            var result = new
+            {
+                success = true,
+                gameState = new
+                {
+                    movesCount = gameState!.MovesCount,
+                    score = gameState.Score,
+                    status = gameState.Status.ToString()
+                },
+                tubes = gameState.Tubes.Select(t => new
+                {
+                    id = t.Id,
+                    position = t.Position,
+                    balls = t.Balls.OrderBy(b => b.Position).Select(b => new
+                    {
+                        id = b.Id,
+                        color = b.Color,
+                        position = b.Position
+                    })
+                })
+            };
+
+            return Json(result);
+        }
+        
+        [HttpPost]
+        public async Task<IActionResult> RedoMove(int gameStateId, int movesToRedo = 1)
+        {
+            var success = await _gameLogicService.RedoMoveAsync(gameStateId, movesToRedo);
+            
+            if (!success)
+            {
+                return Json(new { success = false, message = "Não é possível refazer os movimentos" });
+            }
+
+            var gameState = await _context.GameStates
+                .Include(gs => gs.Level)
+                .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
+                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+
+            // Check game state after redo
+            var stateCheck = await _gameStateManager.CheckGameStateAsync(gameStateId);
+            
+            var result = new
+            {
+                success = true,
+                gameState = new
+                {
+                    movesCount = gameState!.MovesCount,
+                    score = gameState.Score,
+                    status = gameState.Status.ToString(),
+                    isWon = stateCheck.IsWon,
+                    isGameOver = stateCheck.IsGameOver
+                },
+                tubes = gameState.Tubes.Select(t => new
+                {
+                    id = t.Id,
+                    position = t.Position,
+                    balls = t.Balls.OrderBy(b => b.Position).Select(b => new
+                    {
+                        id = b.Id,
+                        color = b.Color,
+                        position = b.Position
+                    })
+                })
+            };
+
+            return Json(result);
+        }
+        
+        [HttpGet]
+        public async Task<IActionResult> GetScoreBreakdown(int gameStateId)
+        {
+            var breakdown = await _gameSessionService.GetScoreBreakdownAsync(gameStateId);
+            
+            return Json(new 
+            { 
+                success = true, 
+                breakdown = new
+                {
+                    baseScore = breakdown.BaseScore,
+                    efficiencyBonus = breakdown.EfficiencyBonus,
+                    speedBonus = breakdown.SpeedBonus,
+                    difficultyMultiplier = breakdown.DifficultyMultiplier,
+                    hintPenalty = breakdown.HintPenalty,
+                    perfectGameBonus = breakdown.PerfectGameBonus,
+                    totalScore = breakdown.TotalScore,
+                    breakdownText = breakdown.GetBreakdownText()
+                }
+            });
+        }
+        
+        [HttpPost]
+        public async Task<IActionResult> CheckGameState(int gameStateId)
+        {
+            var stateCheck = await _gameStateManager.CheckGameStateAsync(gameStateId);
+            var progress = await _gameStateManager.GetGameProgressAsync(gameStateId);
+            
+            return Json(new 
+            { 
+                success = true,
+                isGameOver = stateCheck.IsGameOver,
+                isWon = stateCheck.IsWon,
+                endReason = stateCheck.EndReason.ToString(),
+                message = stateCheck.Message,
+                progress = progress,
+                additionalData = stateCheck.AdditionalData
+            });
+        }
+        
+        [HttpGet]
+        public async Task<IActionResult> GetGameProgress(int gameStateId)
+        {
+            var progress = await _gameStateManager.GetGameProgressAsync(gameStateId);
+            
+            return Json(new 
+            { 
+                success = true,
+                progress = progress
+            });
         }
 
         [HttpPost]

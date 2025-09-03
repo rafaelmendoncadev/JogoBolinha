@@ -7,7 +7,8 @@
       "Bash(dotnet ef migrations:*)",
       "Bash(dotnet build)",
       "Bash(dotnet ef database:*)",
-      "Bash(dotnet run:*)"
+      "Bash(dotnet run:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

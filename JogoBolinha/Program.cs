@@ -16,6 +16,9 @@ builder.Services.AddScoped<GameLogicService>();
 builder.Services.AddScoped<LevelGeneratorService>();
 builder.Services.AddScoped<ScoreCalculationService>();
 builder.Services.AddScoped<AchievementService>();
+builder.Services.AddScoped<GameSessionService>();
+builder.Services.AddScoped<HintService>();
+builder.Services.AddScoped<GameStateManager>();
 
 var app = builder.Build();
 

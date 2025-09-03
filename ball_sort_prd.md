@@ -238,10 +238,10 @@ Expert: 5-6 cores, 6-7 tubos, 5-15 bolinhas por cor
 - [x] Animações de movimento
 
 ### Sprint 3 (2 semanas) - Features Principais
-- [ ] Sistema de pontuação
-- [ ] Funcionalidade de undo/redo
-- [ ] Sistema de dicas
-- [ ] Detecção de vitória/derrota
+- [x] Sistema de pontuação
+- [x] Funcionalidade de undo/redo
+- [x] Sistema de dicas
+- [x] Detecção de vitória/derrota
 
 ### Sprint 4 (1 semana) - Polimento
 - [ ] Efeitos visuais e sonoros

@@ -24,6 +24,22 @@
                 <span class="label">Tempo:</span>
                 <span class="value" id="time">@Model.FormattedDuration</span>
             </div>
+            <div class="info-item">
+                <span class="label">Progresso:</span>
+                <span class="value"><span id="completed-tubes">0</span> tubos</span>
+            </div>
+            <div class="info-item">
+                <span class="label">Movimentos Válidos:</span>
+                <span class="value" id="valid-moves">-</span>
+            </div>
+        </div>
+        
+        <!-- Progress Bar -->
+        <div class="progress mt-2" style="height: 20px;">
+            <div id="game-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                 role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                0% completo
+            </div>
         </div>
     </div>
 
@@ -54,16 +70,31 @@
         <button class="btn btn-secondary" id="restart-btn">
             <i class="fas fa-redo"></i> Reiniciar
         </button>
-        <button class="btn btn-warning" id="hint-btn" @(Model.RemainingHints <= 0 ? "disabled" : "")>
-            <i class="fas fa-lightbulb"></i> Dica (@Model.RemainingHints)
+        <button class="btn btn-warning" id="hint-btn" @(Model.RemainingHints <= 0 ? "disabled" : "") title="Mostra um movimento simples">
+            <i class="fas fa-lightbulb"></i> Dica <span class="badge bg-light text-dark">@Model.RemainingHints</span>
         </button>
-        <button class="btn btn-info" id="advanced-hint-btn" @(Model.RemainingAdvancedHints <= 0 ? "disabled" : "")>
-            <i class="fas fa-star"></i> Dica Avançada (@Model.RemainingAdvancedHints)
+        <button class="btn btn-info" id="advanced-hint-btn" @(Model.RemainingAdvancedHints <= 0 ? "disabled" : "") title="Mostra sequência de movimentos">
+            <i class="fas fa-star"></i> Avançada <span class="badge bg-light text-dark">@Model.RemainingAdvancedHints</span>
+        </button>
+        <button class="btn btn-success" id="strategic-hint-btn" title="Mostra melhor sequência para vitória">
+            <i class="fas fa-chess"></i> Estratégica
+        </button>
+        <button class="btn btn-purple" id="tutorial-hint-btn" title="Explica por que o movimento é bom">
+            <i class="fas fa-book"></i> Tutorial
         </button>
         <button class="btn btn-primary" id="undo-btn" @(!Model.CanUndo ? "disabled" : "")>
             <i class="fas fa-undo"></i> Desfazer
         </button>
+        <button class="btn btn-outline-primary" id="undo-multiple-btn" @(!Model.CanUndo ? "disabled" : "")>
+            <i class="fas fa-undo"></i> Desfazer 3x
+        </button>
+        <button class="btn btn-success" id="score-breakdown-btn">
+            <i class="fas fa-chart-bar"></i> Pontuação
+        </button>
     </div>
+    
+    <!-- Message Container for Hint Explanations -->
+    <div id="game-messages"></div>
 
     <!-- Game Footer -->
     <div class="game-footer">
@@ -95,6 +126,9 @@
                     <div class="stat-item">
                         <strong>Tempo:</strong> <span id="final-time">@Model.FormattedDuration</span>
                     </div>
+                    <div class="score-breakdown" id="victory-score-breakdown">
+                        <!-- Score breakdown will be loaded here -->
+                    </div>
                 </div>
             </div>
             <div class="modal-footer justify-content-center">
@@ -107,6 +141,64 @@
                 <a href="@Url.Action("Index", "Game")" class="btn btn-outline-secondary">
                     <i class="fas fa-list"></i> Níveis
                 </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Game Lost Modal -->
+<div class="modal fade" id="game-lost-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">😢 Jogo Perdido!</h5>
+            </div>
+            <div class="modal-body text-center">
+                <h4>Não há mais movimentos possíveis</h4>
+                <p>Não desanime! Tente novamente com uma estratégia diferente.</p>
+                <div class="game-stats">
+                    <div class="stat-item">
+                        <strong>Movimentos usados:</strong> <span id="lost-moves">@Model.GameState.MovesCount</span>
+                    </div>
+                    <div class="stat-item">
+                        <strong>Tempo jogado:</strong> <span id="lost-time">@Model.FormattedDuration</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <button type="button" class="btn btn-primary" id="restart-lost-btn">
+                    <i class="fas fa-redo"></i> Tentar Novamente
+                </button>
+                <a href="@Url.Action("Index", "Game")" class="btn btn-outline-secondary">
+                    <i class="fas fa-list"></i> Escolher Outro Nível
+                </a>
+                <a href="@Url.Action("Index", "Home")" class="btn btn-outline-secondary">
+                    <i class="fas fa-home"></i> Menu Principal
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Score Breakdown Modal -->
+<div class="modal fade" id="score-breakdown-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-chart-bar"></i> Detalhamento da Pontuação</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="score-breakdown-content">
+                    <div class="text-center">
+                        <div class="spinner-border text-info" role="status">
+                            <span class="visually-hidden">Carregando...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
             </div>
         </div>
     </div>
@@ -150,9 +242,14 @@
             // Control buttons
             $('#restart-btn').on('click', restartGame);
             $('#undo-btn').on('click', undoMove);
-            $('#hint-btn').on('click', () => getHint(false));
-            $('#advanced-hint-btn').on('click', () => getHint(true));
+            $('#undo-multiple-btn').on('click', () => undoMultipleMoves(3));
+            $('#hint-btn').on('click', () => getHint('simple'));
+            $('#advanced-hint-btn').on('click', () => getHint('advanced'));
+            $('#strategic-hint-btn').on('click', () => getHint('strategic'));
+            $('#tutorial-hint-btn').on('click', () => getHint('tutorial'));
+            $('#score-breakdown-btn').on('click', showScoreBreakdown);
             $('#restart-victory-btn').on('click', restartGame);
+            $('#restart-lost-btn').on('click', restartGame);
         }
 
         function handleTubeClick(tubeId) {
@@ -196,12 +293,44 @@
             })
             .done(function(response) {
                 if (response.success) {
+                    console.log('=== MOVE RESPONSE RECEIVED ===');
+                    console.log('Full response:', response);
+                    console.log('Game State:', response.gameState);
+                    console.log('isGameOver:', response.gameState.isGameOver);
+                    console.log('isWon:', response.gameState.isWon);
+                    console.log('endReason:', response.gameState.endReason);
+                    console.log('message:', response.gameState.message);
+                    console.log('status:', response.gameState.status);
+                    
                     updateGameState(response);
                     animateMove(response.move, function() {
                         updateTubesDisplay(response.tubes);
                         
-                        if (response.gameState.isWon) {
-                            setTimeout(showVictory, 500);
+                        console.log('=== CHECKING GAME END CONDITIONS ===');
+                        console.log('isGameOver check:', response.gameState.isGameOver, typeof response.gameState.isGameOver);
+                        console.log('isWon check:', response.gameState.isWon, typeof response.gameState.isWon);
+                        
+                        if (response.gameState.isGameOver) {
+                            console.log('=== GAME IS OVER ===');
+                            if (response.gameState.isWon) {
+                                console.log('=== CALLING VICTORY FUNCTION ===');
+                                console.log('Victory! Message:', response.gameState.message);
+                                setTimeout(() => {
+                                    console.log('=== EXECUTING showGameEnd(true) ===');
+                                    showGameEnd(true, response.gameState);
+                                }, 500);
+                            } else {
+                                console.log('=== CALLING DEFEAT FUNCTION ===');
+                                console.log('Defeat! Reason:', response.gameState.endReason, 'Message:', response.gameState.message);
+                                setTimeout(() => {
+                                    console.log('=== EXECUTING showGameEnd(false) ===');
+                                    showGameEnd(false, response.gameState);
+                                }, 500);
+                            }
+                        } else {
+                            console.log('=== GAME CONTINUES - CHECKING STATE ===');
+                            // Check game state for additional info
+                            setTimeout(checkGameState, 1000);
                         }
                         isMoving = false;
                     });
@@ -317,18 +446,30 @@
             });
         }
 
-        function getHint(isAdvanced) {
+        function getHint(hintType) {
             $.post('@Url.Action("GetHint", "Game")', { 
                 gameStateId: gameStateId, 
-                isAdvanced: isAdvanced 
+                hintType: hintType 
             })
             .done(function(response) {
                 if (response.success) {
-                    highlightHint(response.hint, isAdvanced);
-                    showMessage(`Dica ${isAdvanced ? 'avançada' : 'simples'} ativada!`, 'info');
+                    highlightHint(response.hint, response.type, response.explanation);
                     
-                    // Update hint button count (simplified)
-                    location.reload();
+                    // Show hint explanation if available
+                    if (response.explanation) {
+                        showHintExplanation(response.explanation, response.score);
+                    }
+                    
+                    const typeNames = {
+                        'Simple': 'simples',
+                        'Advanced': 'avançada',
+                        'Strategic': 'estratégica',
+                        'Tutorial': 'tutorial'
+                    };
+                    showMessage(`Dica ${typeNames[response.type] || 'simples'} ativada!`, 'info');
+                    
+                    // Update remaining hints count
+                    updateHintButtons();
                 } else {
                     showMessage(response.message, 'error');
                 }
@@ -337,22 +478,105 @@
                 showMessage('Erro de conexão', 'error');
             });
         }
-
-        function highlightHint(hint, isAdvanced) {
-            // Clear previous hints
-            $('.tube').removeClass('hint-from hint-to');
+        
+        function showHintExplanation(explanation, score) {
+            const explanationDiv = $(`
+                <div class="hint-explanation alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="fas fa-lightbulb"></i>
+                    <strong>Dica:</strong> ${explanation}
+                    ${score ? `<br><small class="text-muted">Qualidade do movimento: ${score}/100</small>` : ''}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `);
             
-            if (hint.length >= 2) {
-                const fromTube = $(`.tube[data-tube-id="${hint[0]}"]`);
-                const toTube = $(`.tube[data-tube-id="${hint[1]}"]`);
-                
-                fromTube.addClass('hint-from');
-                toTube.addClass('hint-to');
-                
-                setTimeout(() => {
-                    $('.tube').removeClass('hint-from hint-to');
-                }, 3000);
+            $('#game-messages').append(explanationDiv);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                explanationDiv.fadeOut(() => explanationDiv.remove());
+            }, 10000);
+        }
+        
+        function updateHintButtons() {
+            // Decrement hint count without page reload
+            const hintBtn = $('#hint-btn');
+            const advancedBtn = $('#advanced-hint-btn');
+            
+            const simpleCount = parseInt(hintBtn.find('.badge').text() || '0');
+            const advancedCount = parseInt(advancedBtn.find('.badge').text() || '0');
+            
+            if (simpleCount > 0) {
+                hintBtn.find('.badge').text(simpleCount - 1);
+                if (simpleCount - 1 === 0) {
+                    hintBtn.prop('disabled', true);
+                }
             }
+        }
+
+        function highlightHint(hint, hintType, explanation) {
+            // Clear previous hints
+            $('.tube').removeClass('hint-from hint-to hint-sequence-1 hint-sequence-2');
+            $('.hint-arrow').remove();
+            
+            if (!hint || hint.length < 2) return;
+            
+            // Highlight first move
+            const fromTube = $(`.tube[data-tube-id="${hint[0]}"]`);
+            const toTube = $(`.tube[data-tube-id="${hint[1]}"]`);
+            
+            fromTube.addClass('hint-from');
+            toTube.addClass('hint-to');
+            
+            // Add arrow indicator
+            addHintArrow(fromTube, toTube, 1);
+            
+            // For advanced/strategic hints, show sequence
+            if ((hintType === 'Advanced' || hintType === 'Strategic') && hint.length >= 4) {
+                setTimeout(() => {
+                    const fromTube2 = $(`.tube[data-tube-id="${hint[2]}"]`);
+                    const toTube2 = $(`.tube[data-tube-id="${hint[3]}"]`);
+                    
+                    fromTube2.addClass('hint-sequence-1');
+                    toTube2.addClass('hint-sequence-2');
+                    
+                    addHintArrow(fromTube2, toTube2, 2);
+                }, 1500);
+            }
+            
+            // Auto-clear hints after duration based on type
+            const duration = hintType === 'Tutorial' ? 8000 : 
+                           hintType === 'Strategic' ? 6000 : 
+                           hintType === 'Advanced' ? 5000 : 3000;
+                           
+            setTimeout(() => {
+                $('.tube').removeClass('hint-from hint-to hint-sequence-1 hint-sequence-2');
+                $('.hint-arrow').fadeOut(() => $('.hint-arrow').remove());
+            }, duration);
+        }
+        
+        function addHintArrow(fromTube, toTube, sequenceNumber) {
+            const fromPos = fromTube.offset();
+            const toPos = toTube.offset();
+            
+            const arrow = $(`
+                <div class="hint-arrow hint-arrow-${sequenceNumber}">
+                    <i class="fas fa-arrow-right"></i>
+                    ${sequenceNumber > 1 ? `<span class="sequence-number">${sequenceNumber}</span>` : ''}
+                </div>
+            `);
+            
+            arrow.css({
+                position: 'absolute',
+                left: fromPos.left + fromTube.width() / 2,
+                top: fromPos.top - 30,
+                zIndex: 1000
+            });
+            
+            $('body').append(arrow);
+            
+            arrow.animate({
+                left: toPos.left + toTube.width() / 2
+            }, 1000);
         }
 
         function restartGame() {
@@ -371,9 +595,194 @@
             }
         }
 
-        function showVictory() {
+        function showVictory(gameData) {
+            console.log('=== showVictory CALLED ===');
+            console.log('gameData:', gameData);
+            
             clearInterval(gameTimer);
+            loadScoreBreakdownForVictory();
+            
+            // Add extra info from game data
+            if (gameData && gameData.message) {
+                console.log('Setting victory message:', gameData.message);
+                $('#victory-message').text(gameData.message);
+            }
+            if (gameData && gameData.additionalData) {
+                console.log('Setting completed tubes count:', gameData.additionalData.CompletedTubes);
+                $('#completed-tubes-count').text(gameData.additionalData.CompletedTubes || '');
+            }
+            
+            console.log('=== SHOWING VICTORY MODAL ===');
+            console.log('Victory modal element:', $('#victory-modal')[0]);
             $('#victory-modal').modal('show');
+            
+            // Additional check if modal is visible after attempting to show
+            setTimeout(() => {
+                const modal = $('#victory-modal');
+                console.log('Modal after show attempt - display:', modal.css('display'));
+                console.log('Modal after show attempt - visibility:', modal.css('visibility'));
+                console.log('Modal classes:', modal.attr('class'));
+            }, 100);
+        }
+        
+        function showGameLost(gameData) {
+            clearInterval(gameTimer);
+            $('#lost-moves').text($('#moves').text());
+            $('#lost-time').text($('#time').text());
+            
+            // Add defeat reason
+            if (gameData && gameData.message) {
+                $('#defeat-reason').text(gameData.message);
+            }
+            if (gameData && gameData.additionalData && gameData.additionalData.EmptyTubes > 0) {
+                $('#defeat-hint').show().text(`Dica: Você ainda tem ${gameData.additionalData.EmptyTubes} tubos vazios!`);
+            }
+            
+            $('#game-lost-modal').modal('show');
+        }
+        
+        function undoMultipleMoves(count) {
+            if (isMoving) return;
+            
+            isMoving = true;
+            
+            $.post('@Url.Action("UndoMultipleMoves", "Game")', { 
+                gameStateId: gameStateId, 
+                movesToUndo: count 
+            })
+            .done(function(response) {
+                if (response.success) {
+                    updateGameState(response);
+                    updateTubesDisplay(response.tubes);
+                    showMessage(`${count} movimentos desfeitos!`, 'success');
+                } else {
+                    showMessage(response.message, 'error');
+                }
+                isMoving = false;
+            })
+            .fail(function() {
+                showMessage('Erro de conexão', 'error');
+                isMoving = false;
+            });
+        }
+        
+        function showScoreBreakdown() {
+            $('#score-breakdown-modal').modal('show');
+            
+            $.get('@Url.Action("GetScoreBreakdown", "Game")', { gameStateId: gameStateId })
+            .done(function(response) {
+                if (response.success) {
+                    const breakdown = response.breakdown;
+                    const html = `
+                        <div class="score-breakdown-details">
+                            <div class="score-item">
+                                <span class="label">Pontuação Base:</span>
+                                <span class="value">${breakdown.baseScore}</span>
+                            </div>
+                            ${breakdown.efficiencyBonus > 0 ? `
+                            <div class="score-item bonus">
+                                <span class="label">Bônus de Eficiência:</span>
+                                <span class="value">+${breakdown.efficiencyBonus}</span>
+                            </div>` : ''}
+                            ${breakdown.speedBonus > 0 ? `
+                            <div class="score-item bonus">
+                                <span class="label">Bônus de Velocidade:</span>
+                                <span class="value">+${breakdown.speedBonus}</span>
+                            </div>` : ''}
+                            ${breakdown.perfectGameBonus > 0 ? `
+                            <div class="score-item bonus">
+                                <span class="label">Bônus Jogo Perfeito:</span>
+                                <span class="value">+${breakdown.perfectGameBonus}</span>
+                            </div>` : ''}
+                            ${Math.abs(breakdown.difficultyMultiplier - 1.0) > 0.01 ? `
+                            <div class="score-item multiplier">
+                                <span class="label">Multiplicador Dificuldade:</span>
+                                <span class="value">x${breakdown.difficultyMultiplier.toFixed(1)}</span>
+                            </div>` : ''}
+                            ${breakdown.hintPenalty > 0 ? `
+                            <div class="score-item penalty">
+                                <span class="label">Penalidade por Dicas:</span>
+                                <span class="value">-${breakdown.hintPenalty}</span>
+                            </div>` : ''}
+                            <div class="score-item total">
+                                <span class="label"><strong>Pontuação Total:</strong></span>
+                                <span class="value"><strong>${breakdown.totalScore}</strong></span>
+                            </div>
+                        </div>
+                    `;
+                    $('#score-breakdown-content').html(html);
+                } else {
+                    $('#score-breakdown-content').html('<p class="text-danger">Erro ao carregar pontuação</p>');
+                }
+            })
+            .fail(function() {
+                $('#score-breakdown-content').html('<p class="text-danger">Erro de conexão</p>');
+            });
+        }
+        
+        function loadScoreBreakdownForVictory() {
+            $.get('@Url.Action("GetScoreBreakdown", "Game")', { gameStateId: gameStateId })
+            .done(function(response) {
+                if (response.success) {
+                    const breakdown = response.breakdown;
+                    $('#victory-score-breakdown').html(`
+                        <div class="victory-breakdown">
+                            <small class="text-muted">${breakdown.breakdownText}</small>
+                        </div>
+                    `);
+                }
+            });
+        }
+        
+        function checkGameState() {
+            // Check comprehensive game state
+            $.post('@Url.Action("CheckGameState", "Game")', { gameStateId: gameStateId })
+            .done(function(response) {
+                if (response.success) {
+                    updateProgress(response.progress);
+                    
+                    if (response.isGameOver) {
+                        if (response.isWon) {
+                            setTimeout(() => showGameEnd(true, response), 500);
+                        } else {
+                            setTimeout(() => showGameEnd(false, response), 500);
+                        }
+                    }
+                }
+            });
+        }
+        
+        function updateProgress(progress) {
+            if (!progress) return;
+            
+            // Update progress bar if exists
+            const progressBar = $('#game-progress-bar');
+            if (progressBar.length) {
+                const percentage = progress.ProgressPercentage || 0;
+                progressBar.css('width', percentage + '%');
+                progressBar.attr('aria-valuenow', percentage);
+                progressBar.text(percentage + '% completo');
+            }
+            
+            // Update stats display
+            $('#completed-tubes').text(progress.CompletedTubes || 0);
+            $('#valid-moves').text(progress.ValidMovesCount || 0);
+        }
+        
+        function showGameEnd(isWon, gameData) {
+            console.log('=== showGameEnd CALLED ===');
+            console.log('isWon parameter:', isWon, typeof isWon);
+            console.log('gameData parameter:', gameData);
+            
+            clearInterval(gameTimer);
+            
+            if (isWon) {
+                console.log('=== CALLING showVictory ===');
+                showVictory(gameData);
+            } else {
+                console.log('=== CALLING showGameLost ===');
+                showGameLost(gameData);
+            }
         }
 
         function startTimer() {
@@ -492,12 +901,75 @@
             animation: hintPulse 1s infinite;
             border: 3px solid #ffc107;
             border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 193, 7, 0.6);
         }
 
         .tube.hint-to {
             animation: hintPulse 1s infinite;
             border: 3px solid #28a745;
             border-radius: 10px;
+            box-shadow: 0 0 20px rgba(40, 167, 69, 0.6);
+        }
+        
+        .tube.hint-sequence-1 {
+            animation: hintPulse 1s infinite;
+            border: 3px dashed #17a2b8;
+            border-radius: 10px;
+            opacity: 0.8;
+        }
+        
+        .tube.hint-sequence-2 {
+            animation: hintPulse 1s infinite;
+            border: 3px dashed #6c757d;
+            border-radius: 10px;
+            opacity: 0.8;
+        }
+        
+        .hint-arrow {
+            color: #ffc107;
+            font-size: 24px;
+            animation: arrowMove 1s ease-in-out;
+        }
+        
+        .hint-arrow-2 {
+            color: #17a2b8;
+        }
+        
+        .hint-arrow .sequence-number {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            background: #17a2b8;
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        @@keyframes arrowMove {
+            0% { opacity: 0; transform: translateY(10px); }
+            50% { opacity: 1; }
+            100% { opacity: 0.8; transform: translateY(0); }
+        }
+        
+        .hint-explanation {
+            margin-top: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        
+        #game-messages {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 350px;
         }
 
         @@keyframes hintPulse {
@@ -571,6 +1043,17 @@
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
+        
+        .btn-purple {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        
+        .btn-purple:hover {
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+            color: white;
+        }
 
         .game-footer {
             display: flex;
@@ -586,6 +1069,47 @@
         .stat-item {
             margin: 10px 0;
             font-size: 1.1rem;
+        }
+        
+        /* Score Breakdown Styles */
+        .score-breakdown-details {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .score-item.total {
+            border-top: 2px solid #007bff;
+            border-bottom: none;
+            margin-top: 10px;
+            padding-top: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .score-item.bonus .value {
+            color: #28a745;
+        }
+        
+        .score-item.penalty .value {
+            color: #dc3545;
+        }
+        
+        .score-item.multiplier .value {
+            color: #6f42c1;
+        }
+        
+        .victory-breakdown {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
         }
 
         /* Responsive Design */
