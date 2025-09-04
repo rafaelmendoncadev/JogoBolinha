@@ -1,0 +1,11 @@
+FORCE REBUILD - Railway Deployment
+Timestamp: 2025-01-15 17:30:00
+
+This file forces Railway to rebuild the entire container with latest changes including:
+- Authentication system (AccountController.cs)
+- Profile management (ProfileController.cs) 
+- Saved games UI (Views/Profile/SavedGames.cshtml)
+- Database migrations (AddAuthenticationFields)
+- All user registration and game storage functionality
+
+Deploy SHA: eb8a5d1
