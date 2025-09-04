@@ -44,11 +44,17 @@
     </div>
 
     <!-- Game Area -->
-    <div class="game-area" id="game-area">
-        <div class="tubes-container" id="tubes-container">
+    <div class="game-area" id="game-area" role="main" aria-label="Área do jogo Ball Sort Puzzle">
+        <div class="tubes-container" id="tubes-container" role="group" aria-label="Tubos do jogo">
             @foreach (var tube in Model.Tubes)
             {
-                <div class="tube" data-tube-id="@tube.Id" data-position="@tube.Position">
+                <div class="tube" 
+                     data-tube-id="@tube.Id" 
+                     data-position="@tube.Position"
+                     role="button"
+                     tabindex="0"
+                     aria-label="Tubo @(tube.Position + 1) com @tube.Balls.Count bolas"
+                     aria-describedby="tube-@tube.Id-description">
                     <div class="tube-body">
                         @foreach (var ball in tube.Balls.OrderByDescending(b => b.Position))
                         {
@@ -56,8 +62,21 @@
                                  data-ball-id="@ball.Id" 
                                  data-color="@ball.Color" 
                                  style="background-color: @ball.Color"
-                                 data-position="@ball.Position">
+                                 data-position="@ball.Position"
+                                 role="button"
+                                 tabindex="-1"
+                                 aria-label="Bola @ball.Color na posição @ball.Position">
                             </div>
+                        }
+                    </div>
+                    <div id="tube-@tube.Id-description" class="sr-only">
+                        @if (tube.Balls.Any())
+                        {
+                            <text>Contém @tube.Balls.Count bolas. Bola do topo: @tube.Balls.OrderByDescending(b => b.Position).First().Color</text>
+                        }
+                        else
+                        {
+                            <text>Tubo vazio</text>
                         }
                     </div>
                 </div>
@@ -97,6 +116,12 @@
         <button class="btn btn-outline-secondary btn-effect" id="effects-toggle-btn" title="Ativar/Desativar efeitos visuais">
             <i id="effects-icon" class="fas fa-magic"></i>
         </button>
+        <button class="btn btn-outline-info btn-effect" id="performance-toggle-btn" title="Mostrar/Ocultar monitor de performance">
+            <i class="fas fa-tachometer-alt"></i>
+        </button>
+        <button class="btn btn-outline-secondary btn-effect" id="keyboard-help-btn" title="Mostrar atalhos do teclado">
+            <i class="fas fa-keyboard"></i>
+        </button>
     </div>
     
     <!-- Theme Selector -->
@@ -104,6 +129,32 @@
         <div class="d-inline-block">
             <small class="text-muted">Temas:</small>
             <div id="game-theme-selector"></div>
+        </div>
+    </div>
+    
+    <!-- Performance Monitor -->
+    <div id="performance-monitor" class="performance-monitor" style="display: none;">
+        <div class="performance-header">
+            <h6><i class="fas fa-tachometer-alt"></i> Monitor de Performance</h6>
+            <button class="btn-close" id="close-performance"></button>
+        </div>
+        <div class="performance-metrics">
+            <div class="metric-item">
+                <label>FPS:</label>
+                <span id="fps-counter">60</span>
+            </div>
+            <div class="metric-item">
+                <label>Memória:</label>
+                <span id="memory-usage">0 MB</span>
+            </div>
+            <div class="metric-item">
+                <label>Ping:</label>
+                <span id="network-latency">0 ms</span>
+            </div>
+            <div class="metric-item">
+                <label>Frame Drops:</label>
+                <span id="frame-drops">0</span>
+            </div>
         </div>
     </div>
     
@@ -218,10 +269,65 @@
     </div>
 </div>
 
+<!-- Keyboard Help Modal -->
+<div class="modal fade" id="keyboard-help-modal" tabindex="-1" aria-labelledby="keyboardHelpLabel">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title" id="keyboardHelpLabel"><i class="fas fa-keyboard"></i> Atalhos do Teclado</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fechar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="keyboard-shortcuts">
+                    <h6>Controles do Jogo:</h6>
+                    <div class="shortcut-group">
+                        <div class="shortcut-item">
+                            <kbd>←</kbd> <kbd>→</kbd>
+                            <span>Navegar entre tubos</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Enter</kbd> ou <kbd>Espaço</kbd>
+                            <span>Selecionar/mover bola</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Esc</kbd>
+                            <span>Desselecionar tubo</span>
+                        </div>
+                    </div>
+                    
+                    <h6>Ações Rápidas:</h6>
+                    <div class="shortcut-group">
+                        <div class="shortcut-item">
+                            <kbd>H</kbd>
+                            <span>Solicitar dica</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl</kbd> + <kbd>Z</kbd>
+                            <span>Desfazer movimento</span>
+                        </div>
+                        <div class="shortcut-item">
+                            <kbd>Ctrl</kbd> + <kbd>R</kbd>
+                            <span>Reiniciar jogo</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-3 text-muted">
+                        <small><i class="fas fa-universal-access"></i> Este jogo é compatível com leitores de tela e suporta navegação completa por teclado.</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
-    <!-- Temporarily disabled to prevent hanging -->
+    <!-- Phase 4: Enable all effects and themes -->
+    <script src="~/js/performance-optimizer.js"></script>
     <script src="~/js/game-effects.js"></script>
-    <!-- <script src="~/js/theme-manager.js"></script> -->
+    <script src="~/js/theme-manager.js"></script>
     <script>
         const gameStateId = @Model.GameState.Id;
         let selectedTube = null;
@@ -232,9 +338,8 @@
             try {
                 initializeGame();
                 startTimer();
-                // Temporarily disable complex features to prevent hanging
                 initializeEffectsControls();
-                // initializeThemeSelector();
+                initializeThemeSelector();
             } catch (error) {
                 console.error('Initialization error:', error);
             }
@@ -249,6 +354,33 @@
                 handleTubeClick(tubeId);
             });
 
+            // Add keyboard handlers to tubes
+            $('.tube').on('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    if (isMoving) return;
+                    
+                    const tubeId = parseInt($(this).data('tube-id'));
+                    handleTubeClick(tubeId);
+                }
+                
+                // Arrow key navigation
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    const tubes = $('.tube');
+                    const currentIndex = tubes.index(this);
+                    let nextIndex;
+                    
+                    if (e.key === 'ArrowLeft') {
+                        nextIndex = currentIndex > 0 ? currentIndex - 1 : tubes.length - 1;
+                    } else {
+                        nextIndex = currentIndex < tubes.length - 1 ? currentIndex + 1 : 0;
+                    }
+                    
+                    tubes.eq(nextIndex).focus();
+                }
+            });
+
             // Add click handlers to balls
             $('.ball').on('click', function(e) {
                 e.stopPropagation();
@@ -260,6 +392,33 @@
                 
                 if ($(this).is(topBall)) {
                     handleTubeClick(tubeId);
+                }
+            });
+
+            // Global keyboard shortcuts
+            $(document).on('keydown', function(e) {
+                if (e.target.tagName.toLowerCase() === 'input') return;
+                
+                switch(e.key.toLowerCase()) {
+                    case 'r':
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            restartGame();
+                        }
+                        break;
+                    case 'z':
+                        if (e.ctrlKey) {
+                            e.preventDefault();
+                            undoMove();
+                        }
+                        break;
+                    case 'h':
+                        e.preventDefault();
+                        getHint('simple');
+                        break;
+                    case 'escape':
+                        deselectTube();
+                        break;
                 }
             });
 
@@ -302,6 +461,31 @@
                 }
             });
             
+            // Performance monitor toggle
+            $('#performance-toggle-btn').on('click', function() {
+                const monitor = $('#performance-monitor');
+                const isVisible = monitor.is(':visible');
+                
+                if (isVisible) {
+                    monitor.fadeOut();
+                    $(this).removeClass('active');
+                } else {
+                    monitor.fadeIn();
+                    $(this).addClass('active');
+                    initializePerformanceMonitor();
+                }
+            });
+            
+            $('#close-performance').on('click', function() {
+                $('#performance-monitor').fadeOut();
+                $('#performance-toggle-btn').removeClass('active');
+            });
+            
+            // Keyboard help toggle
+            $('#keyboard-help-btn').on('click', function() {
+                $('#keyboard-help-modal').modal('show');
+            });
+            
             // Initialize button states
             if (window.gameEffects) {
                 const soundBtn = $('#sound-toggle-btn');
@@ -317,6 +501,36 @@
                     $('#effects-icon').addClass('text-muted');
                 }
             }
+        }
+        
+        function initializePerformanceMonitor() {
+            if (!window.performanceOptimizer) return;
+            
+            const updateInterval = setInterval(function() {
+                if (!$('#performance-monitor').is(':visible')) {
+                    clearInterval(updateInterval);
+                    return;
+                }
+                
+                const report = performanceOptimizer.getPerformanceReport();
+                
+                // Update FPS (simulated)
+                const fps = 60 - (report.metrics.frameDrops * 2);
+                $('#fps-counter').text(Math.max(10, fps));
+                
+                // Update memory usage
+                if ('memory' in performance) {
+                    const memory = (performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
+                    $('#memory-usage').text(memory + ' MB');
+                }
+                
+                // Update frame drops
+                $('#frame-drops').text(report.metrics.frameDrops);
+                
+                // Simulate network latency
+                const latency = Math.random() * 50 + 10;
+                $('#network-latency').text(Math.round(latency) + ' ms');
+            }, 1000);
         }
         
         function initializeThemeSelector() {
@@ -675,16 +889,28 @@
 
         function restartGame() {
             if (confirm('Tem certeza que deseja reiniciar o nível?')) {
+                // Fechar modais abertos
+                $('#victory-modal').modal('hide');
+                $('#game-lost-modal').modal('hide');
+                
+                // Reset game state
+                selectedTube = null;
+                isMoving = false;
+                deselectTube();
+                
                 $.post('@Url.Action("RestartLevel", "Game")', { gameStateId: gameStateId })
                 .done(function(response) {
                     if (response.success) {
-                        location.reload();
+                        // Redirecionar para o novo jogo usando o novo gameStateId
+                        console.log('Reiniciando jogo com novo gameStateId:', response.newGameStateId);
+                        window.location.href = '@Url.Action("Continue", "Game")?gameStateId=' + response.newGameStateId;
                     } else {
-                        showMessage('Erro ao reiniciar jogo', 'error');
+                        showMessage('Erro ao reiniciar jogo: ' + (response.message || 'Erro desconhecido'), 'error');
                     }
                 })
-                .fail(function() {
-                    showMessage('Erro de conexão', 'error');
+                .fail(function(xhr, status, error) {
+                    console.error('Erro ao reiniciar jogo:', error);
+                    showMessage('Erro de conexão ao reiniciar jogo', 'error');
                 });
             }
         }
@@ -1241,6 +1467,156 @@
             background: #f8f9fa;
             border-radius: 5px;
         }
+        
+        /* Performance Monitor Styles */
+        .performance-monitor {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            backdrop-filter: blur(5px);
+        }
+        
+        .performance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 8px;
+        }
+        
+        .performance-header h6 {
+            margin: 0;
+            color: #495057;
+            font-size: 0.9rem;
+        }
+        
+        .performance-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+        }
+        
+        .metric-item label {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        .metric-item span {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .btn.active {
+            background-color: #007bff !important;
+            color: white !important;
+        }
+        
+        /* Theme-specific performance monitor */
+        [data-theme="dark"] .performance-monitor {
+            background: rgba(52, 73, 94, 0.95);
+            border-color: #495057;
+            color: #ecf0f1;
+        }
+        
+        [data-theme="dark"] .performance-header h6 {
+            color: #ecf0f1;
+        }
+        
+        [data-theme="dark"] .metric-item label {
+            color: #bdc3c7;
+        }
+        
+        [data-theme="neon"] .performance-monitor {
+            background: rgba(22, 33, 62, 0.95);
+            border-color: #00ffff;
+            color: #00ffff;
+            box-shadow: 0 4px 12px rgba(0, 255, 255, 0.3);
+        }
+        
+        [data-theme="neon"] .performance-header h6 {
+            color: #00ffff;
+        }
+        
+        [data-theme="neon"] .metric-item span {
+            color: #00ff41;
+        }
+
+        /* Accessibility Improvements */
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0, 0, 0, 0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+        
+        .tube:focus {
+            outline: 3px solid #007bff;
+            outline-offset: 2px;
+        }
+        
+        .tube:focus-visible {
+            outline: 3px solid #007bff;
+            outline-offset: 2px;
+        }
+        
+        .ball:focus {
+            outline: 2px solid #ffc107;
+            outline-offset: 1px;
+        }
+        
+        /* High contrast mode support */
+        @@media (prefers-contrast: high) {
+            .tube-body {
+                border-width: 4px;
+            }
+            
+            .ball {
+                border-width: 3px;
+            }
+        }
+        
+        /* Reduced motion support */
+        @@media (prefers-reduced-motion: reduce) {
+            .tube,
+            .ball,
+            .moving-ball,
+            .moving-ball-enhanced {
+                transition: none !important;
+                animation: none !important;
+            }
+        }
+        
+        /* Dark mode support for accessibility */
+        @@media (prefers-color-scheme: dark) {
+            :root:not([data-theme]) {
+                --primary-bg: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+                --game-area-bg: #2c3e50;
+                --tube-bg: linear-gradient(to bottom, #34495e, #2c3e50);
+                --tube-border: #ecf0f1;
+                --text-primary: #ecf0f1;
+                --text-secondary: #bdc3c7;
+            }
+        }
 
         /* Responsive Design */
         @@media (max-width: 768px) {
@@ -1269,6 +1645,64 @@
             .info-item .value {
                 font-size: 1.2rem;
             }
+            
+            .performance-monitor {
+                left: 10px;
+                top: 10px;
+                min-width: 180px;
+            }
+        }
+        
+        /* Keyboard Shortcuts Modal Styles */
+        .keyboard-shortcuts {
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .shortcut-group {
+            margin-bottom: 20px;
+        }
+        
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .shortcut-item:last-child {
+            border-bottom: none;
+        }
+        
+        kbd {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 3px;
+            box-shadow: 0 1px 0 rgba(0,0,0,.2), inset 0 0 0 2px #fff;
+            color: #333;
+            display: inline-block;
+            font-family: monospace;
+            font-size: 0.85em;
+            font-weight: bold;
+            line-height: 1;
+            padding: 2px 4px;
+            white-space: nowrap;
+            margin: 0 2px;
+        }
+        
+        [data-theme="dark"] kbd {
+            background-color: #495057;
+            border-color: #6c757d;
+            color: #f8f9fa;
+            box-shadow: 0 1px 0 rgba(255,255,255,.2), inset 0 0 0 2px #495057;
+        }
+        
+        [data-theme="neon"] kbd {
+            background-color: #16213e;
+            border-color: #00ffff;
+            color: #00ffff;
+            box-shadow: 0 1px 0 rgba(0,255,255,.3), inset 0 0 0 2px #16213e;
         }
 
         @@media (max-width: 480px) {

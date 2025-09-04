@@ -60,6 +60,7 @@ The application follows a layered architecture with clear separation of concerns
 - `GameController` - Game gameplay endpoints and state management
 - `AccountController` - Authentication and user registration
 - `HomeController` - Main navigation and static pages
+- `ProfileController` - User profile and statistics management
 
 ### Database Design Principles
 
@@ -129,6 +130,36 @@ Key performance indexes:
 - Implement proper error handling and validation
 - Follow MVC separation of concerns
 - Write unit tests for game logic services
+
+## Project Structure
+
+```
+JogoBolinha/                    # Main ASP.NET Core MVC application
+├── Controllers/                # MVC Controllers (Game, Account, Home, Profile)
+├── Data/                      # Entity Framework DbContext
+├── Models/                    # Domain models
+│   ├── Game/                  # Game-related entities (GameState, Level, Tube, Ball, etc.)
+│   ├── User/                  # User-related entities (Player, PlayerStats, Achievement, etc.)
+│   └── ViewModels/            # MVC ViewModels for UI data transfer
+├── Services/                  # Business logic layer (9 services)
+├── Views/                     # Razor views and layouts
+├── wwwroot/                   # Static assets (CSS, JS, images)
+├── Migrations/                # EF Core database migrations
+├── Program.cs                 # Application entry point and DI configuration
+└── appsettings.json          # Configuration settings
+
+JogoBolinha.Tests/             # xUnit test project (.NET 9.0)
+├── Models/                    # Model unit tests
+└── Services/                  # Service unit tests (25 tests total)
+```
+
+## Important Files
+
+- `Program.cs:30-40` - Service registration for all game services and authentication
+- `Data/GameDbContext.cs:28-137` - Entity relationships and database indexes configuration
+- `Services/GameLogicService.cs` - Core game mechanics (21KB, primary business logic)
+- `Services/GameStateManager.cs` - Game persistence and state management
+- Database file: `jogabolinha.db` (SQLite, created automatically)
 
 ## Sprint Progress
 Based on the PRD, Sprint 1 (setup and core models) is complete. Focus development on Sprint 2-6 features: UI implementation, game features, polishing, social features, and deployment.

@@ -17,10 +17,89 @@
         <p class="game-subtitle">Organize as bolinhas coloridas nos tubos corretos!</p>
     </div>
 
+    <!-- Saved Games Section -->
+    @if (User.Identity?.IsAuthenticated == true && Model.HasSavedGames)
+    {
+        <div class="saved-games-section">
+            <h3><i class="fas fa-save"></i> Meus Jogos Salvos</h3>
+            
+            <!-- Continue button (destacado) -->
+            @if (Model.MostRecentGame != null)
+            {
+                <div class="continue-game-card">
+                    <a href="@Url.Action("Continue", "Game", new { gameStateId = Model.MostRecentGame.GameStateId })" 
+                       class="btn btn-primary btn-lg continue-btn">
+                        <i class="fas fa-play-circle"></i> 
+                        Continuar Nível @Model.MostRecentGame.LevelNumber 
+                        (@Model.MostRecentGame.ProgressPercentage% completo)
+                    </a>
+                </div>
+            }
+            
+            <!-- Lista de jogos salvos -->
+            <div class="saved-games-list">
+                @foreach (var game in Model.SavedGames)
+                {
+                    <div class="saved-game-card">
+                        <div class="game-info">
+                            <div class="game-level">
+                                <strong>Nível @game.LevelNumber</strong>
+                                <span class="progress-badge">@game.ProgressPercentage%</span>
+                            </div>
+                            <div class="game-details">
+                                <span class="text-muted">
+                                    @game.CompletedTubes/@game.TotalTubes tubos completos
+                                </span>
+                                <span class="separator">•</span>
+                                <span class="text-muted">
+                                    @game.MovesCount movimentos
+                                </span>
+                                @if (game.HintsUsed > 0)
+                                {
+                                    <span class="separator">•</span>
+                                    <span class="text-muted">
+                                        @game.HintsUsed dicas
+                                    </span>
+                                }
+                            </div>
+                            <div class="game-time">
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i>
+                                    Tempo: @game.TimePlayed.ToString(@"hh\:mm\:ss") - 
+                                    Última atividade: @game.LastActivity.ToString("dd/MM HH:mm")
+                                </small>
+                            </div>
+                        </div>
+                        <div class="game-actions">
+                            <a href="@Url.Action("Continue", "Game", new { gameStateId = game.GameStateId })" 
+                               class="btn btn-sm btn-success">
+                                <i class="fas fa-play"></i> Continuar
+                            </a>
+                            <button class="btn btn-sm btn-danger delete-save" 
+                                    data-game-id="@game.GameStateId"
+                                    title="Excluir jogo salvo">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+            
+            @if (Model.SavedGames.Count >= 5)
+            {
+                <div class="view-all-saves">
+                    <a href="@Url.Action("SavedGames", "Profile")" class="btn btn-link">
+                        <i class="fas fa-list"></i> Ver todos os jogos salvos
+                    </a>
+                </div>
+            }
+        </div>
+    }
+
     <!-- Main Menu Buttons -->
     <div class="main-menu">
         <div class="menu-buttons">
-            @if (Model.HasContinueGame)
+            @if (Model.HasContinueGame && !Model.HasSavedGames)
             {
                 <a href="@Url.Action("Continue", "Game", new { gameStateId = Model.ContinueGameState!.Id })" class="menu-btn btn-continue">
                     <i class="fas fa-play"></i>
@@ -394,6 +473,160 @@
             }
         }
 
+        /* Saved Games Section */
+        .saved-games-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            margin-bottom: 40px;
+        }
+
+        .saved-games-section h3 {
+            color: #333;
+            margin-bottom: 25px;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .saved-games-section h3 i {
+            color: #007bff;
+        }
+
+        .continue-game-card {
+            margin-bottom: 25px;
+        }
+
+        .continue-btn {
+            width: 100%;
+            padding: 15px 20px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .continue-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,123,255,0.3);
+        }
+
+        .saved-games-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .saved-game-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+
+        .saved-game-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+            border-color: #007bff;
+        }
+
+        .game-info {
+            flex: 1;
+        }
+
+        .game-level {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .game-level strong {
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        .progress-badge {
+            background: #007bff;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .game-details {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .separator {
+            margin: 0 8px;
+            color: #ccc;
+        }
+
+        .game-time {
+            font-size: 0.8rem;
+        }
+
+        .game-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .game-actions .btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            border: none;
+            transition: all 0.2s ease;
+        }
+
+        .game-actions .btn-success:hover {
+            background-color: #28a745;
+            transform: scale(1.05);
+        }
+
+        .game-actions .btn-danger:hover {
+            background-color: #dc3545;
+            transform: scale(1.05);
+        }
+
+        .view-all-saves {
+            text-align: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .view-all-saves .btn-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 15px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .view-all-saves .btn-link:hover {
+            background-color: #f8f9fa;
+            color: #0056b3;
+        }
+
         /* Button hover animations */
         .menu-btn::before {
             content: '';
@@ -408,6 +641,76 @@
 
         .menu-btn:hover::before {
             left: 100%;
+        }
+
+        /* Notification System */
+        .notification {
+            position: fixed;
+            top: -100px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 10000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            border-left: 4px solid #007bff;
+        }
+
+        .notification-success {
+            border-left-color: #28a745;
+            background-color: #f8fff9;
+        }
+
+        .notification-success i {
+            color: #28a745;
+        }
+
+        .notification-error {
+            border-left-color: #dc3545;
+            background-color: #fff8f8;
+        }
+
+        .notification-error i {
+            color: #dc3545;
+        }
+
+        .notification span {
+            color: #333;
+            font-weight: 500;
+        }
+
+        /* Responsive for saved games */
+        @@media (max-width: 768px) {
+            .saved-games-section {
+                padding: 20px;
+            }
+            
+            .saved-game-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+            
+            .game-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            
+            .continue-btn {
+                font-size: 1rem;
+                padding: 12px 16px;
+            }
+            
+            .notification {
+                right: 10px;
+                left: 10px;
+                max-width: calc(100% - 20px);
+            }
         }
     </style>
 }
@@ -462,6 +765,68 @@
                     ripple.remove();
                 });
             });
+
+            // Handle delete saved game
+            $('.delete-save').on('click', function(e) {
+                e.preventDefault();
+                const gameId = $(this).data('game-id');
+                const $card = $(this).closest('.saved-game-card');
+                const levelNumber = $card.find('strong').text();
+                
+                if (confirm(`Tem certeza que deseja excluir o jogo salvo "${levelNumber}"? Esta ação não pode ser desfeita.`)) {
+                    $.ajax({
+                        url: '@Url.Action("DeleteSavedGame", "Profile")',
+                        type: 'POST',
+                        data: { gameStateId: gameId },
+                        success: function(response) {
+                            if (response.success) {
+                                $card.fadeOut(300, function() {
+                                    $(this).remove();
+                                    
+                                    // Check if no more saved games
+                                    if ($('.saved-games-list .saved-game-card').length === 0) {
+                                        $('.saved-games-section').fadeOut(300);
+                                    }
+                                });
+                                
+                                // Show success message
+                                showNotification('Jogo salvo excluído com sucesso!', 'success');
+                            } else {
+                                showNotification(response.message || 'Erro ao excluir jogo salvo.', 'error');
+                            }
+                        },
+                        error: function() {
+                            showNotification('Erro de conexão. Tente novamente.', 'error');
+                        }
+                    });
+                }
+            });
+        });
+
+        // Notification system
+        function showNotification(message, type = 'info') {
+            const notification = $(`
+                <div class="notification notification-${type}">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
+                    <span>${message}</span>
+                </div>
+            `);
+            
+            $('body').append(notification);
+            
+            notification.animate({
+                top: '20px',
+                opacity: 1
+            }, 300);
+            
+            setTimeout(() => {
+                notification.animate({
+                    top: '-100px',
+                    opacity: 0
+                }, 300, function() {
+                    $(this).remove();
+                });
+            }, 3000);
         });
     </script>
 }
