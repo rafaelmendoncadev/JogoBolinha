@@ -68,7 +68,7 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<GameDbContext>();
     try
     {
-        context.Database.EnsureCreated();
+        context.Database.Migrate();
         
         // Generate initial levels if none exist
         if (!context.Levels.Any())
@@ -95,7 +95,7 @@ using (var scope = app.Services.CreateScope())
             {
                 var fallbackConnectionString = builder.Configuration.GetConnectionString("DefaultConnection");
                 startupLogger.LogInformation("Attempting to create database at: {ConnectionString}", fallbackConnectionString);
-                context.Database.EnsureCreated();
+                context.Database.Migrate();
             }
             catch (Exception dbEx)
             {
