@@ -27,11 +27,14 @@ namespace JogoBolinha.Services
     {
         private readonly GameDbContext _context;
         private readonly ScoreCalculationService _scoreService;
+        private readonly Dictionary<int, (GameState gameState, DateTime cachedAt)> _gameStateCache;
+        private readonly TimeSpan _cacheExpiry = TimeSpan.FromSeconds(30);
 
         public GameStateManager(GameDbContext context, ScoreCalculationService scoreService)
         {
             _context = context;
             _scoreService = scoreService;
+            _gameStateCache = new Dictionary<int, (GameState, DateTime)>();
         }
 
         /// <summary>
@@ -39,9 +42,16 @@ namespace JogoBolinha.Services
         /// </summary>
         public async Task<GameStateResult> CheckGameStateAsync(int gameStateId)
         {
+            var stackTrace = new System.Diagnostics.StackTrace();
+            var callingMethod = stackTrace.GetFrame(1)?.GetMethod()?.Name ?? "Unknown";
+            var callingClass = stackTrace.GetFrame(1)?.GetMethod()?.DeclaringType?.Name ?? "Unknown";
+            
+            Console.WriteLine($"[CHECK LOG] CheckGameStateAsync called from {callingClass}.{callingMethod} for gameStateId: {gameStateId}");
+            
             var gameState = await GetGameStateAsync(gameStateId);
             if (gameState == null)
             {
+                Console.WriteLine($"[ERROR] GameState {gameStateId} not found");
                 return new GameStateResult 
                 { 
                     IsGameOver = true, 
@@ -50,33 +60,46 @@ namespace JogoBolinha.Services
                 };
             }
 
+            // Skip checks if game is already over
+            if (gameState.Status == GameStatus.Completed || gameState.Status == GameStatus.Failed)
+            {
+                Console.WriteLine($"[SKIP] GameState {gameStateId} already finished with status: {gameState.Status}");
+                return new GameStateResult 
+                { 
+                    IsGameOver = true,
+                    IsWon = gameState.Status == GameStatus.Completed,
+                    EndReason = gameState.Status == GameStatus.Completed ? GameEndReason.Victory : GameEndReason.NoMovesLeft
+                };
+            }
+
+            Console.WriteLine($"[CHECKING] Verifying victory condition for gameStateId: {gameStateId}");
             // Priority 1: Check for victory
             var victoryCheck = CheckVictoryCondition(gameState);
-            Console.WriteLine($"=== GameStateManager.CheckGameStateAsync ===");
-            Console.WriteLine($"GameStateId: {gameStateId}");
-            Console.WriteLine($"Victory check result - IsWon: {victoryCheck.IsWon}, IsGameOver: {victoryCheck.IsGameOver}");
-            Console.WriteLine($"Victory message: {victoryCheck.Message}");
             
             if (victoryCheck.IsWon)
             {
-                Console.WriteLine("=== HANDLING VICTORY ===");
+                Console.WriteLine($"[VICTORY] GameState {gameStateId} - Victory detected!");
                 await HandleVictoryAsync(gameState);
+                // Invalidate cache after state change
+                InvalidateGameStateCache(gameStateId);
                 return victoryCheck;
             }
 
+            Console.WriteLine($"[CHECKING] Verifying defeat condition for gameStateId: {gameStateId}");
             // Priority 2: Check for defeat (no moves)
             var defeatCheck = CheckDefeatCondition(gameState);
-            Console.WriteLine($"Defeat check result - IsGameOver: {defeatCheck.IsGameOver}");
             
             if (defeatCheck.IsGameOver)
             {
-                Console.WriteLine("=== HANDLING DEFEAT ===");
+                Console.WriteLine($"[DEFEAT] GameState {gameStateId} - No valid moves remaining");
                 await HandleDefeatAsync(gameState);
+                // Invalidate cache after state change
+                InvalidateGameStateCache(gameStateId);
                 return defeatCheck;
             }
 
-            // Game continues
-            Console.WriteLine("=== GAME CONTINUES ===");
+            Console.WriteLine($"[CONTINUE] Game continues for gameStateId: {gameStateId}");
+            
             return new GameStateResult 
             { 
                 IsGameOver = false,
@@ -89,12 +112,14 @@ namespace JogoBolinha.Services
         /// </summary>
         public GameStateResult CheckVictoryCondition(GameState gameState)
         {
-            Console.WriteLine($"=== CheckVictoryCondition Debug (SIMPLIFIED) ===");
-            Console.WriteLine($"Total tubes: {gameState.Tubes.Count}");
-
             // Simple and reliable victory logic: All tubes must be either empty or complete
             bool isWon = gameState.Tubes.All(tube => tube.IsEmpty || tube.IsComplete);
             
+            if (!isWon)
+            {
+                return new GameStateResult { IsGameOver = false };
+            }
+
             // Count completed tubes and colors for the victory message
             int completedTubes = gameState.Tubes.Count(t => t.IsComplete);
             var completedColors = new HashSet<string>();
@@ -102,42 +127,31 @@ namespace JogoBolinha.Services
             
             foreach (var tube in gameState.Tubes)
             {
-                Console.WriteLine($"Tube {tube.Position}: IsEmpty={tube.IsEmpty}, IsComplete={tube.IsComplete}, Balls={tube.Balls.Count}/{tube.Capacity}");
-                
                 if (tube.IsComplete && tube.Balls.Any())
                 {
                     var color = tube.Balls.First().Color;
                     completedColors.Add(color);
-                    Console.WriteLine($"  -> Completed tube with color {color}");
                 }
                 
                 totalBalls += tube.Balls.Count;
             }
 
-            Console.WriteLine($"Victory check result: isWon = {isWon}");
-            Console.WriteLine($"Completed tubes: {completedTubes}, Completed colors: {completedColors.Count}");
-
-            if (isWon)
+            Console.WriteLine($"[VICTORY] GameState {gameState.Id} - {completedColors.Count} colors in {completedTubes} tubes, {gameState.MovesCount} moves");
+            
+            return new GameStateResult
             {
-                Console.WriteLine($"=== VICTORY DETECTED! ===");
-                return new GameStateResult
+                IsGameOver = true,
+                IsWon = true,
+                EndReason = GameEndReason.Victory,
+                Message = $"Parabéns! Você organizou {completedColors.Count} cores em {completedTubes} tubos!",
+                AdditionalData = new Dictionary<string, object>
                 {
-                    IsGameOver = true,
-                    IsWon = true,
-                    EndReason = GameEndReason.Victory,
-                    Message = $"Parabéns! Você organizou {completedColors.Count} cores em {completedTubes} tubos!",
-                    AdditionalData = new Dictionary<string, object>
-                    {
-                        { "CompletedTubes", completedTubes },
-                        { "CompletedColors", completedColors.Count },
-                        { "TotalBalls", totalBalls },
-                        { "Moves", gameState.MovesCount }
-                    }
-                };
-            }
-
-            Console.WriteLine($"=== NO VICTORY ===");
-            return new GameStateResult { IsGameOver = false };
+                    { "CompletedTubes", completedTubes },
+                    { "CompletedColors", completedColors.Count },
+                    { "TotalBalls", totalBalls },
+                    { "Moves", gameState.MovesCount }
+                }
+            };
         }
 
         /// <summary>
@@ -346,13 +360,64 @@ namespace JogoBolinha.Services
             }
         }
 
-        private async Task<GameState?> GetGameStateAsync(int gameStateId)
+        public async Task<GameState> GetGameStateAsync(int gameStateId)
         {
-            return await _context.GameStates
+            var stackTrace = new System.Diagnostics.StackTrace();
+            var callingMethod = stackTrace.GetFrame(1)?.GetMethod()?.Name ?? "Unknown";
+            var callingClass = stackTrace.GetFrame(1)?.GetMethod()?.DeclaringType?.Name ?? "Unknown";
+            
+            Console.WriteLine($"[QUERY LOG] GetGameStateAsync called from {callingClass}.{callingMethod} for gameStateId: {gameStateId}");
+            
+            // Check cache first
+            if (_gameStateCache.TryGetValue(gameStateId, out var cached))
+            {
+                if (DateTime.UtcNow - cached.cachedAt < _cacheExpiry)
+                {
+                    Console.WriteLine($"[CACHE HIT] Returning cached game state for gameStateId: {gameStateId}");
+                    return cached.gameState;
+                }
+                else
+                {
+                    // Remove expired cache entry
+                    _gameStateCache.Remove(gameStateId);
+                    Console.WriteLine($"[CACHE EXPIRED] Removed expired cache for gameStateId: {gameStateId}");
+                }
+            }
+
+            Console.WriteLine($"[DB QUERY] Executing database query for gameStateId: {gameStateId}");
+            var gameState = await _context.GameStates
                 .Include(gs => gs.Tubes)
                     .ThenInclude(t => t.Balls)
                 .Include(gs => gs.Level)
+                .AsNoTracking() // Optimize for read-only operations
                 .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+
+            // Cache the result if found
+            if (gameState != null)
+            {
+                _gameStateCache[gameStateId] = (gameState, DateTime.UtcNow);
+                Console.WriteLine($"[CACHE STORED] Cached game state for gameStateId: {gameStateId}");
+            }
+
+            return gameState;
+        }
+
+        /// <summary>
+        /// Invalidate cache for a specific game state (call after moves/changes)
+        /// </summary>
+        public void InvalidateGameStateCache(int gameStateId)
+        {
+            _gameStateCache.Remove(gameStateId);
+            Console.WriteLine($"[CACHE INVALIDATED] GameStateId: {gameStateId}");
+        }
+
+        /// <summary>
+        /// Clear all cached game states
+        /// </summary>
+        public void ClearCache()
+        {
+            _gameStateCache.Clear();
+            Console.WriteLine($"[CACHE CLEARED] All game states removed from cache");
         }
     }
 }

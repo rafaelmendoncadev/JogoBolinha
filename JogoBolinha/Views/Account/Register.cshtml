@@ -1,0 +1,262 @@
+@model JogoBolinha.Models.ViewModels.RegisterViewModel
+@{
+    ViewData["Title"] = "Criar Conta";
+    Layout = "_Layout";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <h2 class="mb-0">
+                        <i class="fas fa-user-plus me-2"></i>
+                        Criar Conta
+                    </h2>
+                    <p class="mb-0 mt-2">Junte-se ao Jogo da Bolinha!</p>
+                </div>
+                <div class="card-body p-4">
+                    <form asp-action="Register" method="post" id="registerForm" novalidate>
+                        <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+                        
+                        <!-- Username -->
+                        <div class="mb-3">
+                            <label asp-for="Username" class="form-label fw-bold">
+                                <i class="fas fa-user me-1"></i>
+                                @Html.DisplayNameFor(m => m.Username)
+                            </label>
+                            <div class="input-group">
+                                <input asp-for="Username" class="form-control" placeholder="Digite seu nome de usuário" autocomplete="username" />
+                                <span class="input-group-text" id="username-feedback">
+                                    <i class="fas fa-circle-notch fa-spin d-none" id="username-loading"></i>
+                                    <i class="fas fa-check text-success d-none" id="username-success"></i>
+                                    <i class="fas fa-times text-danger d-none" id="username-error"></i>
+                                </span>
+                            </div>
+                            <span asp-validation-for="Username" class="text-danger small"></span>
+                            <div id="username-message" class="small mt-1"></div>
+                        </div>
+
+                        <!-- Email -->
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label fw-bold">
+                                <i class="fas fa-envelope me-1"></i>
+                                @Html.DisplayNameFor(m => m.Email)
+                            </label>
+                            <div class="input-group">
+                                <input asp-for="Email" class="form-control" placeholder="Digite seu email" autocomplete="email" />
+                                <span class="input-group-text" id="email-feedback">
+                                    <i class="fas fa-circle-notch fa-spin d-none" id="email-loading"></i>
+                                    <i class="fas fa-check text-success d-none" id="email-success"></i>
+                                    <i class="fas fa-times text-danger d-none" id="email-error"></i>
+                                </span>
+                            </div>
+                            <span asp-validation-for="Email" class="text-danger small"></span>
+                            <div id="email-message" class="small mt-1"></div>
+                        </div>
+
+                        <!-- Password -->
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label fw-bold">
+                                <i class="fas fa-lock me-1"></i>
+                                @Html.DisplayNameFor(m => m.Password)
+                            </label>
+                            <div class="input-group">
+                                <input asp-for="Password" class="form-control" placeholder="Digite sua senha" autocomplete="new-password" />
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                                </button>
+                            </div>
+                            <span asp-validation-for="Password" class="text-danger small"></span>
+                            <div class="password-strength mt-1">
+                                <div class="progress" style="height: 5px;">
+                                    <div class="progress-bar" id="passwordStrength" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <small id="passwordStrengthText" class="text-muted">Digite uma senha</small>
+                            </div>
+                        </div>
+
+                        <!-- Confirm Password -->
+                        <div class="mb-3">
+                            <label asp-for="ConfirmPassword" class="form-label fw-bold">
+                                <i class="fas fa-lock me-1"></i>
+                                @Html.DisplayNameFor(m => m.ConfirmPassword)
+                            </label>
+                            <input asp-for="ConfirmPassword" class="form-control" placeholder="Confirme sua senha" autocomplete="new-password" />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Terms -->
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input asp-for="AcceptTerms" class="form-check-input" />
+                                <label asp-for="AcceptTerms" class="form-check-label">
+                                    Aceito os <a href="#" class="text-primary">termos de uso</a> e <a href="#" class="text-primary">política de privacidade</a>
+                                </label>
+                            </div>
+                            <span asp-validation-for="AcceptTerms" class="text-danger small"></span>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="fas fa-user-plus me-2"></i>
+                                Criar Conta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="card-footer text-center py-3 bg-light">
+                    <p class="mb-0">
+                        Já tem uma conta? 
+                        <a asp-action="Login" class="text-primary fw-bold text-decoration-none">
+                            <i class="fas fa-sign-in-alt me-1"></i>
+                            Fazer Login
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function() {
+            let usernameTimeout, emailTimeout;
+            
+            // Toggle password visibility
+            $('#togglePassword').click(function() {
+                const passwordField = $('#Password');
+                const icon = $('#togglePasswordIcon');
+                
+                if (passwordField.attr('type') === 'password') {
+                    passwordField.attr('type', 'text');
+                    icon.removeClass('fa-eye').addClass('fa-eye-slash');
+                } else {
+                    passwordField.attr('type', 'password');
+                    icon.removeClass('fa-eye-slash').addClass('fa-eye');
+                }
+            });
+            
+            // Password strength indicator
+            $('#Password').on('input', function() {
+                const password = $(this).val();
+                const strength = calculatePasswordStrength(password);
+                updatePasswordStrength(strength);
+            });
+            
+            // Real-time username validation
+            $('#Username').on('input', function() {
+                const username = $(this).val().trim();
+                
+                clearTimeout(usernameTimeout);
+                resetUsernameValidation();
+                
+                if (username.length >= 3) {
+                    $('#username-loading').removeClass('d-none');
+                    
+                    usernameTimeout = setTimeout(function() {
+                        checkUsername(username);
+                    }, 500);
+                }
+            });
+            
+            // Real-time email validation
+            $('#Email').on('input', function() {
+                const email = $(this).val().trim();
+                
+                clearTimeout(emailTimeout);
+                resetEmailValidation();
+                
+                if (email.length > 0 && isValidEmail(email)) {
+                    $('#email-loading').removeClass('d-none');
+                    
+                    emailTimeout = setTimeout(function() {
+                        checkEmail(email);
+                    }, 500);
+                }
+            });
+            
+            function calculatePasswordStrength(password) {
+                let score = 0;
+                if (password.length >= 6) score += 20;
+                if (password.length >= 8) score += 20;
+                if (/[a-z]/.test(password)) score += 20;
+                if (/[A-Z]/.test(password)) score += 20;
+                if (/[0-9]/.test(password)) score += 10;
+                if (/[^A-Za-z0-9]/.test(password)) score += 10;
+                return Math.min(score, 100);
+            }
+            
+            function updatePasswordStrength(strength) {
+                const progressBar = $('#passwordStrength');
+                const text = $('#passwordStrengthText');
+                
+                progressBar.css('width', strength + '%');
+                
+                if (strength < 40) {
+                    progressBar.removeClass().addClass('progress-bar bg-danger');
+                    text.text('Senha fraca').removeClass().addClass('text-danger');
+                } else if (strength < 70) {
+                    progressBar.removeClass().addClass('progress-bar bg-warning');
+                    text.text('Senha média').removeClass().addClass('text-warning');
+                } else {
+                    progressBar.removeClass().addClass('progress-bar bg-success');
+                    text.text('Senha forte').removeClass().addClass('text-success');
+                }
+            }
+            
+            function checkUsername(username) {
+                $.get('@Url.Action("CheckUsername", "Account")', { username: username })
+                    .done(function(data) {
+                        $('#username-loading').addClass('d-none');
+                        
+                        if (data.available) {
+                            $('#username-success').removeClass('d-none');
+                            $('#username-message').text(data.message).removeClass().addClass('text-success small mt-1');
+                        } else {
+                            $('#username-error').removeClass('d-none');
+                            $('#username-message').text(data.message).removeClass().addClass('text-danger small mt-1');
+                        }
+                    })
+                    .fail(function() {
+                        resetUsernameValidation();
+                    });
+            }
+            
+            function checkEmail(email) {
+                $.get('@Url.Action("CheckEmail", "Account")', { email: email })
+                    .done(function(data) {
+                        $('#email-loading').addClass('d-none');
+                        
+                        if (data.available) {
+                            $('#email-success').removeClass('d-none');
+                            $('#email-message').text(data.message).removeClass().addClass('text-success small mt-1');
+                        } else {
+                            $('#email-error').removeClass('d-none');
+                            $('#email-message').text(data.message).removeClass().addClass('text-danger small mt-1');
+                        }
+                    })
+                    .fail(function() {
+                        resetEmailValidation();
+                    });
+            }
+            
+            function resetUsernameValidation() {
+                $('#username-loading, #username-success, #username-error').addClass('d-none');
+                $('#username-message').text('');
+            }
+            
+            function resetEmailValidation() {
+                $('#email-loading, #email-success, #email-error').addClass('d-none');
+                $('#email-message').text('');
+            }
+            
+            function isValidEmail(email) {
+                const emailRegex = /^[^\\s@@]+@@[^\\s@@]+\\.[^\\s@@]+$/;
+                return emailRegex.test(email);
+            }
+        });
+    </script>
+}

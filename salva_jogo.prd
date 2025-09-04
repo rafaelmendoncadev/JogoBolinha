@@ -1,0 +1,530 @@
+# PRD: Sistema de Carregamento de Jogos Salvos - Jogo da Bolinha
+
+## 1. Resumo Executivo
+
+### 1.1 Visão Geral
+Este PRD define a implementação do sistema de carregamento de jogos salvos para o Jogo da Bolinha. Atualmente, o sistema salva o progresso dos jogadores no banco de dados, mas não oferece interface para recuperar e continuar jogos anteriores.
+
+### 1.2 Problema
+- Jogadores logados perdem acesso aos jogos em andamento ao sair da aplicação
+- Não há visibilidade dos jogos salvos na interface
+- Usuários começam sempre do nível 1, perdendo todo progresso anterior
+- Sistema já salva dados mas não os recupera de forma útil
+
+### 1.3 Solução
+Implementar interface completa para visualização, carregamento e gerenciamento de jogos salvos, aproveitando a infraestrutura de persistência existente.
+
+## 2. Objetivos e Métricas
+
+### 2.1 Objetivos Principais
+1. **Permitir continuação de jogos**: Jogadores podem retomar exatamente onde pararam
+2. **Visibilidade do progresso**: Interface clara mostrando todos os jogos salvos
+3. **Gestão de saves**: Permitir deletar jogos salvos antigos
+4. **Auto-save melhorado**: Salvamento automático a cada movimento
+
+### 2.2 Métricas de Sucesso
+- 100% dos jogos em andamento recuperáveis após logout/login
+- Tempo de carregamento de jogo salvo < 2 segundos
+- Taxa de uso do recurso > 80% dos usuários logados
+- Zero perda de dados em casos de fechamento inesperado
+
+## 3. Requisitos Funcionais
+
+### 3.1 Tela Inicial (Home)
+
+#### 3.1.1 Seção "Meus Jogos Salvos"
+**Descrição**: Card dedicado na home para jogos salvos do usuário
+
+**Componentes**:
+- Título: "Meus Jogos Salvos"
+- Lista de até 5 jogos recentes em andamento
+- Para cada jogo mostrar:
+  - Nível (ex: "Nível 15")
+  - Data/hora do último save
+  - Progresso (ex: "3/5 tubos completos")
+  - Movimentos realizados
+  - Tempo de jogo
+  - Botão "Continuar"
+  - Botão "Excluir" (com confirmação)
+
+**Comportamento**:
+- Só aparece para usuários logados
+- Ordenado por data de modificação (mais recente primeiro)
+- Link "Ver todos" se houver mais de 5 jogos
+
+#### 3.1.2 Botão Principal "Continuar Último Jogo"
+**Descrição**: Botão destacado para retomar o jogo mais recente
+
+**Aparência**:
+```html
+<button class="btn btn-primary btn-lg">
+  <i class="fas fa-play-circle"></i> 
+  Continuar Nível 15 (70% completo)
+</button>
+```
+
+**Lógica**:
+- Só aparece se existe jogo em andamento
+- Mostra nível e progresso inline
+- Um clique leva direto ao jogo
+
+### 3.2 Página "Meus Jogos"
+
+#### 3.2.1 Listagem Completa
+**URL**: `/Profile/SavedGames`
+
+**Funcionalidades**:
+- Grid/tabela com todos os jogos salvos
+- Colunas: Nível, Status, Progresso, Movimentos, Tempo, Última Atividade, Ações
+- Filtros: Em andamento, Completos, Todos
+- Ordenação por qualquer coluna
+- Paginação (20 itens por página)
+
+#### 3.2.2 Ações em Massa
+- Checkbox para seleção múltipla
+- Botão "Excluir Selecionados"
+- Botão "Excluir Jogos Antigos" (> 30 dias)
+
+### 3.3 Sistema de Auto-Save
+
+#### 3.3.1 Triggers de Salvamento
+**Quando salvar**:
+- Após cada movimento válido
+- Ao usar botão desfazer/refazer
+- Ao solicitar dica
+- Ao pausar o jogo (perder foco da janela)
+- Antes de fechar a página (beforeunload)
+
+#### 3.3.2 Indicador Visual
+**Implementação**:
+```javascript
+// Mostrar ícone de salvamento
+function showSaveIndicator() {
+  $('#save-indicator').fadeIn(200);
+  setTimeout(() => $('#save-indicator').fadeOut(500), 1500);
+}
+```
+
+**UI**:
+- Pequeno ícone no canto superior direito
+- Texto: "Salvando..." com spinner
+- Muda para "✓ Salvo" quando completo
+
+### 3.4 Backend - Controllers
+
+#### 3.4.1 HomeController Modificado
+```csharp
+public async Task<IActionResult> Index()
+{
+    var model = new HomeViewModel();
+    
+    if (User.Identity?.IsAuthenticated == true)
+    {
+        var playerId = GetCurrentPlayerId();
+        
+        // Buscar jogos salvos
+        model.SavedGames = await _context.GameStates
+            .Include(gs => gs.Level)
+            .Where(gs => gs.PlayerId == playerId 
+                      && gs.Status == GameStatus.InProgress)
+            .OrderByDescending(gs => gs.StartTime)
+            .Take(5)
+            .Select(gs => new SavedGameViewModel
+            {
+                GameStateId = gs.Id,
+                LevelNumber = gs.Level.Number,
+                MovesCount = gs.MovesCount,
+                StartTime = gs.StartTime,
+                LastActivity = gs.LastModified ?? gs.StartTime,
+                ProgressPercentage = CalculateProgress(gs),
+                CompletedTubes = CountCompletedTubes(gs),
+                TotalTubes = gs.Tubes.Count
+            })
+            .ToListAsync();
+            
+        model.HasSavedGames = model.SavedGames.Any();
+        model.MostRecentGame = model.SavedGames.FirstOrDefault();
+    }
+    
+    return View(model);
+}
+```
+
+#### 3.4.2 ProfileController Novo Método
+```csharp
+[Authorize]
+public async Task<IActionResult> SavedGames(int page = 1, string filter = "all")
+{
+    var playerId = GetCurrentPlayerId();
+    var query = _context.GameStates
+        .Include(gs => gs.Level)
+        .Where(gs => gs.PlayerId == playerId);
+    
+    // Aplicar filtros
+    query = filter switch
+    {
+        "inprogress" => query.Where(gs => gs.Status == GameStatus.InProgress),
+        "completed" => query.Where(gs => gs.Status == GameStatus.Completed),
+        _ => query
+    };
+    
+    var totalItems = await query.CountAsync();
+    var games = await query
+        .OrderByDescending(gs => gs.LastModified ?? gs.StartTime)
+        .Skip((page - 1) * 20)
+        .Take(20)
+        .ToListAsync();
+    
+    var model = new SavedGamesListViewModel
+    {
+        Games = games,
+        CurrentPage = page,
+        TotalPages = (int)Math.Ceiling(totalItems / 20.0),
+        Filter = filter
+    };
+    
+    return View(model);
+}
+
+[HttpPost]
+[Authorize]
+public async Task<IActionResult> DeleteSavedGame(int gameStateId)
+{
+    var playerId = GetCurrentPlayerId();
+    var gameState = await _context.GameStates
+        .FirstOrDefaultAsync(gs => gs.Id == gameStateId 
+                                 && gs.PlayerId == playerId);
+    
+    if (gameState != null)
+    {
+        _context.GameStates.Remove(gameState);
+        await _context.SaveChangesAsync();
+        return Json(new { success = true });
+    }
+    
+    return Json(new { success = false, message = "Jogo não encontrado" });
+}
+```
+
+#### 3.4.3 GameController Auto-Save
+```csharp
+[HttpPost]
+public async Task<IActionResult> AutoSave(int gameStateId)
+{
+    var playerId = GetCurrentPlayerId();
+    var gameState = await _context.GameStates
+        .FirstOrDefaultAsync(gs => gs.Id == gameStateId 
+                                && (playerId == null || gs.PlayerId == playerId));
+    
+    if (gameState != null)
+    {
+        gameState.LastModified = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+        return Json(new { success = true, timestamp = DateTime.UtcNow });
+    }
+    
+    return Json(new { success = false });
+}
+```
+
+### 3.5 Frontend - JavaScript
+
+#### 3.5.1 Auto-Save Manager
+```javascript
+// game.js - adicionar ao arquivo existente
+class SaveManager {
+    constructor(gameStateId) {
+        this.gameStateId = gameStateId;
+        this.saveTimeout = null;
+        this.lastSaveTime = Date.now();
+    }
+    
+    // Salvar com debounce
+    scheduleSave() {
+        clearTimeout(this.saveTimeout);
+        this.saveTimeout = setTimeout(() => this.save(), 1000);
+    }
+    
+    // Executar salvamento
+    async save() {
+        const now = Date.now();
+        if (now - this.lastSaveTime < 500) return; // Evitar saves muito frequentes
+        
+        this.showIndicator();
+        
+        try {
+            const response = await $.post('/Game/AutoSave', { 
+                gameStateId: this.gameStateId 
+            });
+            
+            if (response.success) {
+                this.lastSaveTime = now;
+                this.showSuccess();
+            }
+        } catch (error) {
+            console.error('Erro ao salvar:', error);
+            this.showError();
+        }
+    }
+    
+    showIndicator() {
+        $('#save-indicator').html('<i class="fas fa-spinner fa-spin"></i> Salvando...').fadeIn(200);
+    }
+    
+    showSuccess() {
+        $('#save-indicator').html('<i class="fas fa-check"></i> Salvo').delay(1000).fadeOut(500);
+    }
+    
+    showError() {
+        $('#save-indicator').html('<i class="fas fa-exclamation-triangle"></i> Erro ao salvar').delay(2000).fadeOut(500);
+    }
+}
+
+// Inicializar no document.ready
+const saveManager = new SaveManager(gameStateId);
+
+// Adicionar triggers em eventos existentes
+function makeMove(fromTubeId, toTubeId) {
+    // ... código existente ...
+    $.post('/Game/MakeMove', data).done(function(response) {
+        if (response.success) {
+            // ... código existente ...
+            saveManager.scheduleSave(); // Adicionar aqui
+        }
+    });
+}
+
+// Salvar ao sair da página
+window.addEventListener('beforeunload', () => {
+    saveManager.save();
+});
+```
+
+### 3.6 Views
+
+#### 3.6.1 Home/Index.cshtml
+```html
+@model HomeViewModel
+
+<!-- Seção de Jogos Salvos -->
+@if (User.Identity?.IsAuthenticated == true && Model.HasSavedGames)
+{
+    <div class="saved-games-section mb-4">
+        <h3><i class="fas fa-save"></i> Meus Jogos Salvos</h3>
+        
+        <!-- Botão de continuar destacado -->
+        @if (Model.MostRecentGame != null)
+        {
+            <div class="mb-3">
+                <a href="@Url.Action("Continue", "Game", new { gameStateId = Model.MostRecentGame.GameStateId })" 
+                   class="btn btn-primary btn-lg w-100">
+                    <i class="fas fa-play-circle"></i> 
+                    Continuar Nível @Model.MostRecentGame.LevelNumber 
+                    (@Model.MostRecentGame.ProgressPercentage% completo)
+                </a>
+            </div>
+        }
+        
+        <!-- Lista de jogos salvos -->
+        <div class="saved-games-list">
+            @foreach (var game in Model.SavedGames)
+            {
+                <div class="saved-game-card d-flex justify-content-between align-items-center p-2 mb-2 border rounded">
+                    <div class="game-info">
+                        <strong>Nível @game.LevelNumber</strong>
+                        <span class="text-muted ms-2">
+                            @game.CompletedTubes/@game.TotalTubes tubos
+                        </span>
+                        <br/>
+                        <small class="text-muted">
+                            @game.MovesCount movimentos - 
+                            @game.LastActivity.ToString("dd/MM HH:mm")
+                        </small>
+                    </div>
+                    <div class="game-actions">
+                        <a href="@Url.Action("Continue", "Game", new { gameStateId = game.GameStateId })" 
+                           class="btn btn-sm btn-success">
+                            <i class="fas fa-play"></i> Continuar
+                        </a>
+                        <button class="btn btn-sm btn-danger delete-save" 
+                                data-game-id="@game.GameStateId">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+        
+        @if (Model.SavedGames.Count >= 5)
+        {
+            <div class="text-center mt-2">
+                <a href="@Url.Action("SavedGames", "Profile")" class="btn btn-link">
+                    Ver todos os jogos salvos
+                </a>
+            </div>
+        }
+    </div>
+}
+```
+
+#### 3.6.2 Game/Game.cshtml - Indicador de Save
+```html
+<!-- Adicionar no topo da página -->
+<div id="save-indicator" class="save-indicator">
+    <i class="fas fa-spinner fa-spin"></i> Salvando...
+</div>
+
+<style>
+.save-indicator {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 5px;
+    display: none;
+    z-index: 10000;
+    font-size: 14px;
+}
+</style>
+```
+
+## 4. Requisitos Não-Funcionais
+
+### 4.1 Performance
+- Carregamento de lista de saves < 500ms
+- Salvamento automático < 200ms
+- Não bloquear UI durante salvamento
+
+### 4.2 Segurança
+- Validar que usuário só acessa próprios saves
+- Prevenir acesso a saves de outros usuários via URL manipulation
+- Rate limiting em endpoints de salvamento (max 10/minuto)
+
+### 4.3 Usabilidade
+- Feedback visual claro de salvamento
+- Confirmação antes de deletar saves
+- Interface responsiva mobile-friendly
+
+### 4.4 Confiabilidade
+- Retry automático em falhas de salvamento
+- Queue de saves pendentes se offline
+- Backup diário do banco de dados
+
+## 5. Migração de Dados
+
+### 5.1 Alterações no Banco
+```sql
+-- Adicionar campo LastModified em GameStates
+ALTER TABLE GameStates 
+ADD COLUMN LastModified DATETIME NULL;
+
+-- Criar índice para queries de usuário
+CREATE INDEX IX_GameStates_PlayerId_Status_LastModified 
+ON GameStates (PlayerId, Status, LastModified DESC);
+```
+
+### 5.2 Migration Entity Framework
+```csharp
+public partial class AddLastModifiedToGameState : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.AddColumn<DateTime>(
+            name: "LastModified",
+            table: "GameStates",
+            type: "TEXT",
+            nullable: true);
+            
+        migrationBuilder.CreateIndex(
+            name: "IX_GameStates_PlayerId_Status_LastModified",
+            table: "GameStates",
+            columns: new[] { "PlayerId", "Status", "LastModified" });
+    }
+}
+```
+
+## 6. Plano de Implementação
+
+### Fase 1: Backend (2 dias) ok
+1. Adicionar campo LastModified ao modelo
+2. Criar migration e atualizar banco
+3. Implementar métodos no HomeController
+4. Criar ProfileController.SavedGames
+5. Adicionar endpoint AutoSave
+
+### Fase 2: Frontend Básico (2 dias)
+1. Atualizar Home/Index com lista de saves
+2. Implementar botão "Continuar"
+3. Criar página de gerenciamento de saves
+4. Adicionar botões de deletar com confirmação
+
+### Fase 3: Auto-Save (1 dia)
+1. Implementar SaveManager JavaScript
+2. Adicionar indicador visual
+3. Integrar com eventos de jogo
+4. Testar salvamento beforeunload
+
+### Fase 4: Testes e Polish (1 dia)
+1. Testes de integração
+2. Testes de performance
+3. Ajustes de UI/UX
+4. Documentação
+
+## 7. Critérios de Aceitação
+
+### 7.1 Funcionalidades Core
+- [ ] Usuário logado vê seus jogos salvos na home
+- [ ] Botão "Continuar" carrega jogo no estado exato
+- [ ] Auto-save funciona após cada movimento
+- [ ] Indicador visual mostra status do salvamento
+- [ ] Possível deletar jogos salvos individualmente
+
+### 7.2 Edge Cases
+- [ ] Sistema funciona com múltiplas abas abertas
+- [ ] Saves não conflitam entre usuários diferentes
+- [ ] Graceful degradation se auto-save falhar
+- [ ] Limite de saves por usuário (máx 50)
+
+### 7.3 Performance
+- [ ] Lista de 20 saves carrega em < 1 segundo
+- [ ] Auto-save não causa lag perceptível
+- [ ] Funciona em conexões 3G
+
+## 8. Riscos e Mitigações
+
+### 8.1 Riscos Identificados
+1. **Sobrecarga do banco**: Muitos saves simultâneos
+   - *Mitigação*: Implementar cache e debounce
+   
+2. **Perda de dados**: Falha no salvamento
+   - *Mitigação*: Retry automático e queue local
+   
+3. **Conflitos de versão**: Múltiplas abas/dispositivos
+   - *Mitigação*: Timestamp validation
+
+### 8.2 Plano de Rollback
+- Feature flag para desabilitar auto-save
+- Manter backup antes da migração
+- Monitoramento de erros em produção
+
+## 9. Métricas de Acompanhamento
+
+### 9.1 KPIs Técnicos
+- Taxa de sucesso de saves (target: >99%)
+- Tempo médio de carregamento (target: <2s)
+- Número de saves por usuário/dia
+
+### 9.2 KPIs de Negócio
+- % usuários usando saves (target: >80%)
+- Taxa de retorno de jogadores (target: +30%)
+- Tempo médio de sessão (target: +20%)
+
+## 10. Conclusão
+
+Esta implementação resolve completamente o problema de salvamento de progresso, transformando dados já persistidos em valor real para o usuário. Com auto-save transparente e interface intuitiva, os jogadores nunca mais perderão progresso, aumentando engajamento e satisfação com o jogo.
+
+**Tempo estimado**: 6 dias de desenvolvimento
+**Prioridade**: ALTA
+**ROI esperado**: Aumento de 40% na retenção de usuários

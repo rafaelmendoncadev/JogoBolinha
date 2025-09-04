@@ -8,47 +8,71 @@ Ball Sort Puzzle Game - A web-based puzzle game where players organize colored b
 
 ## Technology Stack
 
-- **Framework:** ASP.NET Core 8.0 MVC
+- **Framework:** ASP.NET Core 8.0 MVC (.NET 9.0 for tests)
 - **Language:** C# 12
 - **Database:** SQLite with Entity Framework Core
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript/jQuery
+- **Testing:** xUnit with Moq and InMemory database
+- **Authentication:** Cookie-based authentication
 - **Development:** Git version control
+
+## Common Development Commands
+
+From the root directory:
+
+### Build and Run
+- `cd JogoBolinha && dotnet build` - Build the main application
+- `cd JogoBolinha && dotnet run` - Run the development server
+- `cd JogoBolinha && dotnet watch run` - Run with hot reload
+
+### Testing
+- `dotnet test JogoBolinha.Tests/` - Run all tests (25 tests currently)
+- `dotnet test JogoBolinha.Tests/ --logger "console;verbosity=detailed"` - Run tests with detailed output
+- `dotnet test JogoBolinha.Tests/ --collect:"XPlat Code Coverage"` - Run tests with code coverage
+
+### Database Operations
+- `cd JogoBolinha && dotnet ef migrations add <MigrationName>` - Add new migration
+- `cd JogoBolinha && dotnet ef database update` - Apply migrations to database
+- `cd JogoBolinha && dotnet ef database drop` - Drop the database (jogabolinha.db)
 
 ## Project Architecture
 
-### MVC Structure
-```
-Controllers/
-├── HomeController.cs      - Main menu and navigation
-├── GameController.cs      - Core game functionality
-├── ProfileController.cs   - User profiles and stats
-└── LeaderboardController.cs - Rankings and competition
+### Core Architecture Components
 
-Models/
-├── Game/
-│   ├── GameState.cs      - Current game state
-│   ├── Tube.cs          - Game tube container
-│   ├── Ball.cs          - Ball entity
-│   └── Level.cs         - Level configuration
-├── User/
-│   ├── Player.cs        - Player entity
-│   ├── PlayerStats.cs   - Player statistics
-│   └── Achievement.cs   - Achievement system
-└── ViewModels/          - View-specific models
+The application follows a layered architecture with clear separation of concerns:
 
-Services/
-├── GameLogicService.cs          - Core game rules and validation
-├── LevelGeneratorService.cs     - Dynamic level creation
-├── ScoreCalculationService.cs   - Scoring algorithm
-└── AchievementService.cs        - Achievement tracking
-```
+**Data Layer** (`Data/GameDbContext.cs`): 
+- EF Core DbContext managing 11 entities with complex relationships
+- Optimized with strategic indexes on frequently queried fields
+- Cascade and restrict delete behaviors for referential integrity
 
-### Database Entities
-- **Players:** User profiles and authentication
-- **GameSessions:** Individual game records with scores and moves
-- **Levels:** Level definitions and solutions
-- **Achievements:** Achievement system with player progress
-- **Leaderboards:** Global and weekly rankings
+**Service Layer** (`Services/`):
+- `GameLogicService` - Core game mechanics and rule validation
+- `GameStateManager` - Manages game state persistence and retrieval
+- `LevelGeneratorService` - Procedural level generation algorithms
+- `ScoreCalculationService` - Complex scoring with bonuses and penalties
+- `HintService` - AI-powered hint system (simple and advanced)
+- `GameSessionService` - Game session lifecycle management
+- `AchievementService` - Achievement tracking and unlocking
+- `AuthenticationService` + `PasswordHashService` - Secure user authentication
+
+**Controller Layer**:
+- `GameController` - Game gameplay endpoints and state management
+- `AccountController` - Authentication and user registration
+- `HomeController` - Main navigation and static pages
+
+### Database Design Principles
+
+The database schema uses sophisticated Entity Framework relationships:
+- **One-to-One**: Player ↔ PlayerStats (cascade delete)
+- **One-to-Many**: GameState → Tubes/Balls/Moves (cascade delete)
+- **Many-to-One**: GameState → Level (restrict delete to preserve history)
+- **Many-to-Many**: Player ↔ Achievements via PlayerAchievement junction table
+
+Key performance indexes:
+- Unique indexes on Player.Username and Player.Email
+- Composite index on GameSession(PlayerId, LevelId) for leaderboards
+- Score indexes on Leaderboard for ranking queries
 
 ## Game Mechanics
 

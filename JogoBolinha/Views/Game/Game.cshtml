@@ -401,9 +401,8 @@
                                 }, 500);
                             }
                         } else {
-                            console.log('=== GAME CONTINUES - CHECKING STATE ===');
-                            // Check game state for additional info
-                            setTimeout(checkGameState, 1000);
+                            console.log('=== GAME CONTINUES ===');
+                            // Game continues normally without polling
                         }
                         isMoving = false;
                     });
@@ -835,22 +834,47 @@
             });
         }
         
+        // Debounce variables for checkGameState
+        let checkGameStateTimeout = null;
+        let isCheckingGameState = false;
+        
         function checkGameState() {
-            // Check comprehensive game state
-            $.post('@Url.Action("CheckGameState", "Game")', { gameStateId: gameStateId })
-            .done(function(response) {
-                if (response.success) {
-                    updateProgress(response.progress);
-                    
-                    if (response.isGameOver) {
-                        if (response.isWon) {
-                            setTimeout(() => showGameEnd(true, response), 500);
-                        } else {
-                            setTimeout(() => showGameEnd(false, response), 500);
+            // Clear any pending timeout
+            if (checkGameStateTimeout) {
+                clearTimeout(checkGameStateTimeout);
+            }
+            
+            // If already checking, skip this call
+            if (isCheckingGameState) {
+                return;
+            }
+            
+            // Debounce the call by 300ms
+            checkGameStateTimeout = setTimeout(() => {
+                isCheckingGameState = true;
+                
+                // Check comprehensive game state
+                $.post('@Url.Action("CheckGameState", "Game")', { gameStateId: gameStateId })
+                .done(function(response) {
+                    if (response.success) {
+                        updateProgress(response.progress);
+                        
+                        if (response.isGameOver) {
+                            if (response.isWon) {
+                                setTimeout(() => showGameEnd(true, response), 500);
+                            } else {
+                                setTimeout(() => showGameEnd(false, response), 500);
+                            }
                         }
                     }
-                }
-            });
+                })
+                .fail(function(xhr, status, error) {
+                    console.warn('Erro ao verificar estado do jogo:', error);
+                })
+                .always(function() {
+                    isCheckingGameState = false;
+                });
+            }, 300);
         }
         
         function updateProgress(progress) {

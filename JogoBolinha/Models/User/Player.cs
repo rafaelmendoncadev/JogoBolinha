@@ -21,6 +21,21 @@ namespace JogoBolinha.Models.User
         
         public bool IsActive { get; set; } = true;
         
+        // Campos de autenticação
+        [Required]
+        public string PasswordHash { get; set; } = string.Empty;
+        
+        [Required]
+        public string PasswordSalt { get; set; } = string.Empty;
+        
+        public bool EmailConfirmed { get; set; } = false;
+        
+        public string SecurityStamp { get; set; } = Guid.NewGuid().ToString();
+        
+        public int FailedLoginAttempts { get; set; } = 0;
+        
+        public DateTime? LockoutEnd { get; set; }
+        
         public PlayerStats? Stats { get; set; }
         
         public ICollection<Game.GameSession> GameSessions { get; set; } = new List<Game.GameSession>();

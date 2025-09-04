@@ -30,6 +30,8 @@ namespace JogoBolinha.Models.Game
         
         public DateTime? EndTime { get; set; }
         
+        public DateTime? LastModified { get; set; }
+        
         public int Score { get; set; } = 0;
         
         public ICollection<Tube> Tubes { get; set; } = new List<Tube>();

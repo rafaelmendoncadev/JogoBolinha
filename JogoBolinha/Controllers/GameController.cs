@@ -5,6 +5,7 @@ using JogoBolinha.Models.Game;
 using JogoBolinha.Services;
 using JogoBolinha.Models.ViewModels;
 using System.Text.Json;
+using System.Security.Claims;
 
 namespace JogoBolinha.Controllers
 {
@@ -33,43 +34,87 @@ namespace JogoBolinha.Controllers
 
         public async Task<IActionResult> Index()
         {
-            await EnsureLevelsExistAsync();
-            
-            var levels = await _context.Levels
-                .OrderBy(l => l.Number)
-                .Take(10)
-                .ToListAsync();
+            try
+            {
+                Console.WriteLine($"[DEBUG] Index action started");
                 
-            return View(levels);
+                await EnsureLevelsExistAsync();
+                Console.WriteLine($"[DEBUG] EnsureLevelsExistAsync completed");
+                
+                var levels = await _context.Levels
+                    .OrderBy(l => l.Number)
+                    .Take(10)
+                    .ToListAsync();
+                    
+                Console.WriteLine($"[DEBUG] Found {levels.Count} levels");
+                
+                return View(levels);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Exception in Index action: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+                throw;
+            }
         }
 
         public async Task<IActionResult> Play(int levelNumber = 1)
         {
-            var level = await GetOrCreateLevelAsync(levelNumber);
-            var gameState = await CreateNewGameStateAsync(level);
-            
-            var viewModel = await CreateGameViewModelAsync(gameState);
-            return View("Game", viewModel);
+            try
+            {
+                Console.WriteLine($"[DEBUG] Play action started for level {levelNumber}");
+                
+                await EnsureLevelsExistAsync();
+                Console.WriteLine($"[DEBUG] EnsureLevelsExistAsync completed");
+                
+                var level = await GetOrCreateLevelAsync(levelNumber);
+                Console.WriteLine($"[DEBUG] Level obtained: {level?.Id} - {level?.Number}");
+                
+                var playerId = GetCurrentPlayerId();
+                Console.WriteLine($"[DEBUG] PlayerId: {playerId}");
+                
+                var gameState = await CreateNewGameStateAsync(level, playerId);
+                Console.WriteLine($"[DEBUG] GameState created: {gameState?.Id}");
+                
+                var viewModel = CreateGameViewModel(gameState);
+                Console.WriteLine($"[DEBUG] ViewModel created, returning view");
+                
+                return View("Game", viewModel);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ERROR] Exception in Play action: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+                throw;
+            }
         }
         
         public async Task<IActionResult> Continue(int gameStateId)
         {
+            var playerId = GetCurrentPlayerId();
             var gameState = await _context.GameStates
                 .Include(gs => gs.Level)
                 .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
                 .Include(gs => gs.Moves)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
                 
             if (gameState == null)
-                return RedirectToAction("Index");
+                return NotFound();
                 
-            var viewModel = await CreateGameViewModelAsync(gameState);
+            var viewModel = CreateGameViewModel(gameState);
             return View("Game", viewModel);
         }
 
         [HttpPost]
         public async Task<IActionResult> MakeMove(int gameStateId, int fromTubeId, int toTubeId)
         {
+            var playerId = GetCurrentPlayerId();
+            var gameState = await _context.GameStates
+                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
+            
+            if (gameState == null)
+                return Json(new { success = false, message = "Jogo não encontrado" });
+
             var move = await _gameLogicService.ExecuteMoveAsync(gameStateId, fromTubeId, toTubeId);
             
             if (move == null)
@@ -77,22 +122,25 @@ namespace JogoBolinha.Controllers
                 return Json(new { success = false, message = "Movimento inválido" });
             }
 
+            // Invalidate cache after move
+            _gameStateManager.InvalidateGameStateCache(gameStateId);
+
             // Check game state after move
             var stateCheck = await _gameStateManager.CheckGameStateAsync(gameStateId);
             
             // Get updated game state
-            var gameState = await _context.GameStates
+            var updatedGameState = await _context.GameStates
                 .Include(gs => gs.Level)
                 .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
                 .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
 
             // If game ended, complete the session
-            if (stateCheck.IsGameOver && stateCheck.IsWon && gameState!.Score == 0)
+            if (stateCheck.IsGameOver && stateCheck.IsWon)
             {
                 await _gameSessionService.CompleteGameSessionAsync(gameStateId, true);
                 
                 // Refresh game state to get updated score
-                gameState = await _context.GameStates
+                updatedGameState = await _context.GameStates
                     .Include(gs => gs.Level)
                     .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
                     .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
@@ -110,15 +158,15 @@ namespace JogoBolinha.Controllers
                 },
                 gameState = new
                 {
-                    movesCount = gameState!.MovesCount,
-                    score = gameState.Score,
-                    status = gameState.Status.ToString(),
+                    movesCount = updatedGameState!.MovesCount,
+                    score = updatedGameState.Score,
+                    status = updatedGameState.Status.ToString(),
                     isWon = stateCheck.IsWon,
                     isGameOver = stateCheck.IsGameOver,
                     endReason = stateCheck.EndReason.ToString(),
                     message = stateCheck.Message
                 },
-                tubes = gameState.Tubes.Select(t => new
+                tubes = updatedGameState.Tubes.Select(t => new
                 {
                     id = t.Id,
                     position = t.Position,
@@ -137,12 +185,22 @@ namespace JogoBolinha.Controllers
         [HttpPost]
         public async Task<IActionResult> UndoMove(int gameStateId)
         {
+            var playerId = GetCurrentPlayerId();
+            var gameStateExists = await _context.GameStates
+                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
+            
+            if (!gameStateExists)
+                return Json(new { success = false, message = "Jogo não encontrado" });
+
             var success = await _gameLogicService.UndoMoveAsync(gameStateId);
             
             if (!success)
             {
                 return Json(new { success = false, message = "Não é possível desfazer o movimento" });
             }
+
+            // Invalidate cache after undo
+            _gameStateManager.InvalidateGameStateCache(gameStateId);
 
             var gameState = await _context.GameStates
                 .Include(gs => gs.Level)
@@ -177,6 +235,13 @@ namespace JogoBolinha.Controllers
         [HttpPost]
         public async Task<IActionResult> GetHint(int gameStateId, string hintType = "simple")
         {
+            var playerId = GetCurrentPlayerId();
+            var gameStateExists = await _context.GameStates
+                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
+            
+            if (!gameStateExists)
+                return Json(new { success = false, message = "Jogo não encontrado" });
+
             var type = hintType.ToLower() switch
             {
                 "advanced" => HintType.Advanced,
@@ -185,9 +250,9 @@ namespace JogoBolinha.Controllers
                 _ => HintType.Simple
             };
 
-            var hintResult = await _hintService.GetHintAsync(gameStateId, type);
+            var hint = await _hintService.GetHintAsync(gameStateId, type);
             
-            if (hintResult == null || !hintResult.TubeIds.Any())
+            if (hint == null || !hint.TubeIds.Any())
             {
                 return Json(new { success = false, message = "Nenhuma dica disponível" });
             }
@@ -195,22 +260,50 @@ namespace JogoBolinha.Controllers
             return Json(new 
             { 
                 success = true, 
-                hint = hintResult.TubeIds, 
-                explanation = hintResult.Explanation,
-                score = hintResult.Score,
-                type = hintResult.Type.ToString()
+                hint = hint.TubeIds, 
+                explanation = hint.Explanation,
+                score = hint.Score,
+                type = hint.Type.ToString()
             });
+        }
+        
+        [HttpPost]
+        public async Task<IActionResult> AutoSave(int gameStateId)
+        {
+            var playerId = GetCurrentPlayerId();
+            var gameState = await _context.GameStates
+                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && 
+                                        (playerId == null || gs.PlayerId == playerId));
+            
+            if (gameState != null)
+            {
+                gameState.LastModified = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return Json(new { success = true, timestamp = gameState.LastModified });
+            }
+            
+            return Json(new { success = false, message = "Jogo não encontrado" });
         }
         
         [HttpPost]
         public async Task<IActionResult> UndoMultipleMoves(int gameStateId, int movesToUndo = 1)
         {
+            var playerId = GetCurrentPlayerId();
+            var gameStateExists = await _context.GameStates
+                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
+            
+            if (!gameStateExists)
+                return Json(new { success = false, message = "Jogo não encontrado" });
+
             var success = await _gameLogicService.UndoMultipleMovesAsync(gameStateId, movesToUndo);
             
             if (!success)
             {
                 return Json(new { success = false, message = "Não é possível desfazer os movimentos" });
             }
+
+            // Invalidate cache after multiple undo
+            _gameStateManager.InvalidateGameStateCache(gameStateId);
 
             var gameState = await _context.GameStates
                 .Include(gs => gs.Level)
@@ -245,6 +338,13 @@ namespace JogoBolinha.Controllers
         [HttpPost]
         public async Task<IActionResult> RedoMove(int gameStateId, int movesToRedo = 1)
         {
+            var playerId = GetCurrentPlayerId();
+            var gameStateExists = await _context.GameStates
+                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
+            
+            if (!gameStateExists)
+                return Json(new { success = false, message = "Jogo não encontrado" });
+
             var success = await _gameLogicService.RedoMoveAsync(gameStateId, movesToRedo);
             
             if (!success)
@@ -342,19 +442,23 @@ namespace JogoBolinha.Controllers
         [HttpPost]
         public async Task<IActionResult> RestartLevel(int gameStateId)
         {
+            var playerId = GetCurrentPlayerId();
             var gameState = await _context.GameStates
                 .Include(gs => gs.Level)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
                 
             if (gameState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
-            var newGameState = await CreateNewGameStateAsync(gameState.Level);
+            // Invalidate cache for old game state
+            _gameStateManager.InvalidateGameStateCache(gameStateId);
+            
+            var newGameState = await CreateNewGameStateAsync(gameState.Level, playerId);
             
             return Json(new { success = true, newGameStateId = newGameState.Id });
         }
 
-        private async Task<GameViewModel> CreateGameViewModelAsync(GameState gameState)
+        private GameViewModel CreateGameViewModel(GameState gameState)
         {
             return new GameViewModel
             {
@@ -368,12 +472,13 @@ namespace JogoBolinha.Controllers
             };
         }
 
-        private async Task<GameState> CreateNewGameStateAsync(Level level)
+        private async Task<GameState> CreateNewGameStateAsync(Level level, int? playerId = null)
         {
             var gameState = new GameState
             {
                 LevelId = level.Id,
                 Level = level,
+                PlayerId = playerId,
                 Status = GameStatus.InProgress,
                 StartTime = DateTime.UtcNow
             };
@@ -414,10 +519,15 @@ namespace JogoBolinha.Controllers
             await _context.SaveChangesAsync();
 
             // Reload with relations
-            return await _context.GameStates
+            var reloadedGameState = await _context.GameStates
                 .Include(gs => gs.Level)
                 .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
                 .FirstAsync(gs => gs.Id == gameState.Id);
+                
+            // Invalidate any existing cache for this new game state
+            _gameStateManager.InvalidateGameStateCache(gameState.Id);
+            
+            return reloadedGameState;
         }
 
         private async Task<Level> GetOrCreateLevelAsync(int levelNumber)
@@ -432,6 +542,16 @@ namespace JogoBolinha.Controllers
             }
             
             return level;
+        }
+
+        private int? GetCurrentPlayerId()
+        {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (int.TryParse(userIdClaim, out int userId))
+            {
+                return userId;
+            }
+            return null;
         }
 
         private async Task EnsureLevelsExistAsync()

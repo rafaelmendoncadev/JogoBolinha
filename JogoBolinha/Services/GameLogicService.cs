@@ -59,6 +59,7 @@ namespace JogoBolinha.Services
             
             gameState.MovesCount++;
             gameState.Moves.Add(move);
+            gameState.LastModified = DateTime.UtcNow;
             
             // Check for victory
             if (IsGameWon(gameState))
@@ -106,6 +107,7 @@ namespace JogoBolinha.Services
             // Update move as undone
             lastMove.IsUndone = true;
             gameState.MovesCount--;
+            gameState.LastModified = DateTime.UtcNow;
             
             // Reset game status if it was completed
             if (gameState.Status == GameStatus.Completed)

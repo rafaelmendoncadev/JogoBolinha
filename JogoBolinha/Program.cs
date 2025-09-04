@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using JogoBolinha.Data;
 using JogoBolinha.Services;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +12,21 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddDbContext<GameDbContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=jogabolinha.db"));
 
-// Register services
+// Configure Authentication
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Account/Login";
+        options.LogoutPath = "/Account/Logout";
+        options.AccessDeniedPath = "/Account/AccessDenied";
+        options.ExpireTimeSpan = TimeSpan.FromHours(2);
+        options.SlidingExpiration = true;
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+    });
+
+// Register game services
 builder.Services.AddScoped<GameLogicService>();
 builder.Services.AddScoped<LevelGeneratorService>();
 builder.Services.AddScoped<ScoreCalculationService>();
@@ -19,6 +34,10 @@ builder.Services.AddScoped<AchievementService>();
 builder.Services.AddScoped<GameSessionService>();
 builder.Services.AddScoped<HintService>();
 builder.Services.AddScoped<GameStateManager>();
+
+// Register authentication services
+builder.Services.AddScoped<IPasswordHashService, PasswordHashService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
 var app = builder.Build();
 
@@ -35,6 +54,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllerRoute(

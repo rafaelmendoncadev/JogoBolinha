@@ -6,5 +6,9 @@ namespace JogoBolinha.Models.ViewModels
     {
         public bool HasContinueGame { get; set; }
         public GameState? ContinueGameState { get; set; }
+        
+        public List<SavedGameViewModel> SavedGames { get; set; } = new List<SavedGameViewModel>();
+        public bool HasSavedGames { get; set; }
+        public SavedGameViewModel? MostRecentGame { get; set; }
     }
 }
