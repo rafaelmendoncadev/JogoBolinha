@@ -30,6 +30,8 @@ namespace JogoBolinha.Models.Game
         public string? SolutionMoves { get; set; } // JSON array of optimal moves
         
         public int MinimumMoves { get; set; } // Minimum moves needed to solve
+
+        public long GenerationSeed { get; set; } // Seed used to generate the level
         
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         

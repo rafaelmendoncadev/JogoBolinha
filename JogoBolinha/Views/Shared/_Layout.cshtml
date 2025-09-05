@@ -39,7 +39,7 @@
                         </li>
                     </ul>
                     <ul class="navbar-nav">
-                        @if (User.Identity.IsAuthenticated)
+                        @if (User.Identity != null && User.Identity.IsAuthenticated)
                         {
                             <li class="nav-item dropdown">
                                 <a class="nav-link dropdown-toggle text-dark" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">

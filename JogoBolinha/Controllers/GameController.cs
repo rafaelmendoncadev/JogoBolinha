@@ -13,14 +13,14 @@ namespace JogoBolinha.Controllers
     {
         private readonly GameDbContext _context;
         private readonly GameLogicService _gameLogicService;
-        private readonly LevelGeneratorService _levelGeneratorService;
+        private readonly LevelGeneratorServiceV2 _levelGeneratorService;
         private readonly ScoreCalculationService _scoreCalculationService;
         private readonly GameSessionService _gameSessionService;
         private readonly HintService _hintService;
         private readonly GameStateManager _gameStateManager;
 
         public GameController(GameDbContext context, GameLogicService gameLogicService, 
-            LevelGeneratorService levelGeneratorService, ScoreCalculationService scoreCalculationService,
+            LevelGeneratorServiceV2 levelGeneratorService, ScoreCalculationService scoreCalculationService,
             GameSessionService gameSessionService, HintService hintService, GameStateManager gameStateManager)
         {
             _context = context;
@@ -68,12 +68,24 @@ namespace JogoBolinha.Controllers
                 Console.WriteLine($"[DEBUG] EnsureLevelsExistAsync completed");
                 
                 var level = await GetOrCreateLevelAsync(levelNumber);
+                if (level == null)
+                {
+                    return NotFound();
+                }
+                if (level == null)
+                {
+                    return NotFound();
+                }
                 Console.WriteLine($"[DEBUG] Level obtained: {level?.Id} - {level?.Number}");
                 
                 var playerId = GetCurrentPlayerId();
                 Console.WriteLine($"[DEBUG] PlayerId: {playerId}");
                 
                 var gameState = await CreateNewGameStateAsync(level, playerId);
+                if (gameState == null)
+                {
+                    return NotFound();
+                }
                 Console.WriteLine($"[DEBUG] GameState created: {gameState?.Id}");
                 
                 var viewModel = CreateGameViewModel(gameState);
@@ -453,13 +465,21 @@ namespace JogoBolinha.Controllers
             // Invalidate cache for old game state
             _gameStateManager.InvalidateGameStateCache(gameStateId);
             
+            if (gameState.Level == null) return Json(new { success = false, message = "Nível não encontrado" });
             var newGameState = await CreateNewGameStateAsync(gameState.Level, playerId);
+            
+            if (newGameState == null)
+                return Json(new { success = false, message = "Erro ao criar novo jogo" });
             
             return Json(new { success = true, newGameStateId = newGameState.Id });
         }
 
-        private GameViewModel CreateGameViewModel(GameState gameState)
+        private GameViewModel CreateGameViewModel(GameState? gameState)
         {
+            if (gameState == null)
+            {
+                return new GameViewModel();
+            }
             return new GameViewModel
             {
                 GameState = gameState,
@@ -472,8 +492,9 @@ namespace JogoBolinha.Controllers
             };
         }
 
-        private async Task<GameState> CreateNewGameStateAsync(Level level, int? playerId = null)
+        private async Task<GameState?> CreateNewGameStateAsync(Level? level, int? playerId = null)
         {
+            if (level == null) return null;
             var gameState = new GameState
             {
                 LevelId = level.Id,
@@ -486,34 +507,14 @@ namespace JogoBolinha.Controllers
             _context.GameStates.Add(gameState);
             await _context.SaveChangesAsync();
 
-            // Parse initial state and create tubes/balls
-            var initialState = JsonSerializer.Deserialize<JsonElement>(level.InitialState);
-            var tubesData = initialState.GetProperty("Tubes").EnumerateArray();
-
-            foreach (var tubeData in tubesData)
+            // Support both compact and legacy JSON formats
+            var tubes = IsCompactFormat(level.InitialState) 
+                ? ParseCompactFormat(level.InitialState, gameState.Id)
+                : ParseJsonFormat(level.InitialState, gameState.Id);
+                
+            foreach (var tube in tubes)
             {
-                var tubeId = tubeData.GetProperty("Id").GetInt32();
-                var tube = new Tube
-                {
-                    GameStateId = gameState.Id,
-                    Position = tubeId,
-                    Capacity = 4
-                };
                 _context.Tubes.Add(tube);
-                await _context.SaveChangesAsync();
-
-                var ballsData = tubeData.GetProperty("Balls").EnumerateArray();
-                foreach (var ballData in ballsData)
-                {
-                    var ball = new Ball
-                    {
-                        GameStateId = gameState.Id,
-                        TubeId = tube.Id,
-                        Color = ballData.GetProperty("Color").GetString()!,
-                        Position = ballData.GetProperty("Position").GetInt32()
-                    };
-                    _context.Balls.Add(ball);
-                }
             }
 
             await _context.SaveChangesAsync();
@@ -530,7 +531,7 @@ namespace JogoBolinha.Controllers
             return reloadedGameState;
         }
 
-        private async Task<Level> GetOrCreateLevelAsync(int levelNumber)
+        private async Task<Level?> GetOrCreateLevelAsync(int levelNumber)
         {
             var level = await _context.Levels.FirstOrDefaultAsync(l => l.Number == levelNumber);
             
@@ -568,5 +569,106 @@ namespace JogoBolinha.Controllers
                 await _context.SaveChangesAsync();
             }
         }
+
+        private bool IsCompactFormat(string initialState)
+        {
+            // Compact format starts with "T" and contains "="
+            return initialState.StartsWith("T") && initialState.Contains("=");
+        }
+
+        private List<Tube> ParseJsonFormat(string jsonFormat, int gameStateId)
+        {
+            var tubes = new List<Tube>();
+            try
+            {
+                using var document = JsonDocument.Parse(jsonFormat);
+                var tubesArray = document.RootElement.GetProperty("Tubes");
+                
+                foreach (var tubeElement in tubesArray.EnumerateArray())
+                {
+                    var tube = new Tube
+                    {
+                        GameStateId = gameStateId,
+                        Position = tubeElement.GetProperty("Id").GetInt32(),
+                        Capacity = 4,
+                        Balls = new List<Ball>()
+                    };
+
+                    if (tubeElement.TryGetProperty("Balls", out var ballsElement))
+                    {
+                        foreach (var ballElement in ballsElement.EnumerateArray())
+                        {
+                            var ball = new Ball
+                            {
+                                GameStateId = gameStateId,
+                                Color = ballElement.GetProperty("Color").GetString() ?? ColorPalette[0],
+                                Position = ballElement.GetProperty("Position").GetInt32()
+                            };
+                            tube.Balls.Add(ball);
+                        }
+                    }
+
+                    tubes.Add(tube);
+                }
+            }
+            catch (JsonException)
+            {
+                // Fallback to empty tubes if JSON parsing fails
+                Console.WriteLine($"[WARNING] Failed to parse JSON format: {jsonFormat}");
+            }
+            
+            return tubes;
+        }
+
+        private List<Tube> ParseCompactFormat(string compactFormat, int gameStateId)
+        {
+            var tubes = new List<Tube>();
+            var tubeParts = compactFormat.Split(';');
+            var tubePosition = 0;
+            foreach (var tubePart in tubeParts)
+            {
+                var parts = tubePart.Split('=');
+                var tube = new Tube
+                {
+                    GameStateId = gameStateId,
+                    Position = tubePosition++,
+                    Capacity = 4,
+                    Balls = new List<Ball>()
+                };
+
+                if (parts.Length == 2 && !string.IsNullOrEmpty(parts[1]))
+                {
+                    var balls = parts[1].Split(',');
+                    var ballPosition = 0;
+                    foreach (var ballColorCode in balls)
+                    {
+                        var ball = new Ball
+                        {
+                            GameStateId = gameStateId,
+                            Color = DecodeColor(ballColorCode),
+                            Position = ballPosition++
+                        };
+                        tube.Balls.Add(ball);
+                    }
+                }
+                tubes.Add(tube);
+            }
+            return tubes;
+        }
+
+        private string DecodeColor(string code)
+        {
+            if (int.TryParse(code, out int index) && index >= 0 && index < ColorPalette.Length)
+            {
+                return ColorPalette[index];
+            }
+            return ColorPalette[0];
+        }
+
+        private static readonly string[] ColorPalette = {
+            "#FF6B6B", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7",
+            "#DDA0DD", "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E9",
+            "#F8C471", "#82E0AA", "#F1948A", "#D7BDE2", "#A9DFBF"
+        };
     }
 }

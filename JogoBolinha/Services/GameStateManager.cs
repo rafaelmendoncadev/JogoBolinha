@@ -360,7 +360,7 @@ namespace JogoBolinha.Services
             }
         }
 
-        public async Task<GameState> GetGameStateAsync(int gameStateId)
+        public async Task<GameState?> GetGameStateAsync(int gameStateId)
         {
             var stackTrace = new System.Diagnostics.StackTrace();
             var callingMethod = stackTrace.GetFrame(1)?.GetMethod()?.Name ?? "Unknown";

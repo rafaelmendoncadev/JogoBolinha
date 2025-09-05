@@ -66,7 +66,7 @@ namespace JogoBolinha.Services
             {
                 gameState.Status = GameStatus.Completed;
                 gameState.EndTime = DateTime.UtcNow;
-                gameState.Score = await CalculateScoreAsync(gameState);
+                gameState.Score = CalculateScore(gameState);
             }
             
             _context.GameMoves.Add(move);
@@ -225,7 +225,7 @@ namespace JogoBolinha.Services
             {
                 gameState.Status = GameStatus.Completed;
                 gameState.EndTime = DateTime.UtcNow;
-                gameState.Score = await CalculateScoreAsync(gameState);
+                gameState.Score = CalculateScore(gameState);
             }
             
             await _context.SaveChangesAsync();
@@ -275,7 +275,7 @@ namespace JogoBolinha.Services
             return true; // No valid moves found
         }
         
-        public async Task<int> CalculateScoreAsync(GameState gameState)
+        public int CalculateScore(GameState gameState)
         {
             const int baseScore = 100;
             const int efficiencyBonus = 10;

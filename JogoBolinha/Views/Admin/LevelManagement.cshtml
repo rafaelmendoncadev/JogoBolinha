@@ -1,0 +1,289 @@
+@{
+    ViewData["Title"] = "Gerenciamento de Níveis";
+    Layout = "_Layout";
+}
+
+<style>
+    .level-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        transition: all 0.3s;
+    }
+    
+    .level-card:hover {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .level-card.problematic {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+    }
+    
+    .level-card.good {
+        background-color: #d4edda;
+        border-color: #28a745;
+    }
+    
+    .level-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .level-details {
+        display: flex;
+        gap: 20px;
+    }
+    
+    .badge-custom {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    
+    .difficulty-easy { background: #d4edda; color: #155724; }
+    .difficulty-medium { background: #fff3cd; color: #856404; }
+    .difficulty-hard { background: #f8d7da; color: #721c24; }
+    .difficulty-expert { background: #d1c4e9; color: #4a148c; }
+    
+    .control-panel {
+        position: sticky;
+        top: 20px;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .stats-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+</style>
+
+<div class="container mt-4">
+    <h1><i class="fas fa-cog"></i> Gerenciamento de Níveis - Admin</h1>
+    
+    <div class="row mt-4">
+        <!-- Painel de Controle -->
+        <div class="col-md-4">
+            <div class="control-panel">
+                <h3>Ações em Massa</h3>
+                
+                <div class="stats-card">
+                    <h5>Estatísticas</h5>
+                    <p class="mb-1">Total de Níveis: <strong id="totalLevels">@ViewBag.Levels.Count</strong></p>
+                    <p class="mb-1">Níveis Problemáticos: <strong id="problematicCount" class="text-warning">0</strong></p>
+                    <p class="mb-1">Jogos Ativos: <strong id="activeGames" class="text-info">0</strong></p>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button class="btn btn-warning" onclick="regenerateProblematic()">
+                        <i class="fas fa-exclamation-triangle"></i> Regenerar Níveis Problemáticos
+                    </button>
+                    
+                    <button class="btn btn-danger" onclick="regenerateAll()" 
+                            data-bs-toggle="tooltip" 
+                            title="CUIDADO: Isso irá deletar todos os jogos salvos!">
+                        <i class="fas fa-sync-alt"></i> Regenerar TODOS os Níveis
+                    </button>
+                    
+                    <hr/>
+                    
+                    <button class="btn btn-info" onclick="testLevels()">
+                        <i class="fas fa-vial"></i> Testar Níveis 1-10
+                    </button>
+                    
+                    <button class="btn btn-secondary" onclick="location.reload()">
+                        <i class="fas fa-redo"></i> Recarregar Página
+                    </button>
+                </div>
+                
+                <div class="alert alert-warning mt-3">
+                    <small>
+                        <i class="fas fa-info-circle"></i> 
+                        <strong>Atenção:</strong> Regenerar níveis irá deletar todos os jogos salvos relacionados.
+                    </small>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Lista de Níveis -->
+        <div class="col-md-8">
+            <h3>Lista de Níveis</h3>
+            
+            <div id="levelsList">
+                @foreach (var level in ViewBag.Levels)
+                {
+                    bool isProblematic = !level.IsSolvable || 
+                                       (level.Number <= 10 && level.Colors > 4) ||
+                                       (level.Number <= 3 && level.Colors > 2) ||
+                                       (level.Number == 4 && level.Tubes < 5);
+                    
+                    <div class="level-card @(isProblematic ? "problematic" : "good")" data-level="@level.Number">
+                        <div class="level-info">
+                            <div class="level-details">
+                                <h5 class="mb-0">Nível @level.Number</h5>
+                                
+                                <span class="badge-custom difficulty-@level.Difficulty.ToString().ToLower()">
+                                    @level.Difficulty
+                                </span>
+                                
+                                <span>
+                                    <i class="fas fa-palette"></i> @level.Colors cores
+                                </span>
+                                
+                                <span>
+                                    <i class="fas fa-vial"></i> @level.Tubes tubos (@level.EmptyTubes vazios)
+                                </span>
+                                
+                                <span>
+                                    <i class="fas fa-circle"></i> @level.BallsPerColor bolas/cor
+                                </span>
+                                
+                                @if (level.ActiveGames > 0)
+                                {
+                                    <span class="text-info">
+                                        <i class="fas fa-gamepad"></i> @level.ActiveGames jogos ativos
+                                    </span>
+                                }
+                                
+                                @if (isProblematic)
+                                {
+                                    <span class="text-warning">
+                                        <i class="fas fa-exclamation-triangle"></i> Problemático!
+                                    </span>
+                                }
+                            </div>
+                            
+                            <button class="btn btn-sm btn-outline-primary" onclick="regenerateLevel(@level.Number)">
+                                <i class="fas fa-sync"></i> Regenerar
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Contar estatísticas ao carregar
+        $(document).ready(function() {
+            updateStatistics();
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        });
+        
+        function updateStatistics() {
+            let problematic = $('.level-card.problematic').length;
+            let activeTotal = 0;
+            
+            $('.level-card').each(function() {
+                let text = $(this).text();
+                let match = text.match(/(\d+) jogos ativos/);
+                if (match) {
+                    activeTotal += parseInt(match[1]);
+                }
+            });
+            
+            $('#problematicCount').text(problematic);
+            $('#activeGames').text(activeTotal);
+        }
+        
+        function regenerateLevel(levelNumber) {
+            if (!confirm(`Tem certeza que deseja regenerar o Nível ${levelNumber}? Isso deletará todos os jogos salvos deste nível.`)) {
+                return;
+            }
+            
+            $.post('/Admin/RegenerateLevel', { levelNumber: levelNumber })
+                .done(function(response) {
+                    if (response.success) {
+                        toastr.success(response.message);
+                        // Atualizar visualização do nível
+                        let card = $(`.level-card[data-level="${levelNumber}"]`);
+                        card.removeClass('problematic').addClass('good');
+                        card.fadeOut(200).fadeIn(200);
+                        
+                        // Atualizar informações se retornadas
+                        if (response.level) {
+                            setTimeout(() => location.reload(), 1500);
+                        }
+                    } else {
+                        toastr.error(response.message || 'Erro ao regenerar nível');
+                    }
+                })
+                .fail(function() {
+                    toastr.error('Erro de comunicação com o servidor');
+                });
+        }
+        
+        function regenerateProblematic() {
+            let count = $('.level-card.problematic').length;
+            
+            if (count === 0) {
+                toastr.info('Nenhum nível problemático encontrado!');
+                return;
+            }
+            
+            if (!confirm(`Regenerar ${count} níveis problemáticos? Isso deletará os jogos salvos relacionados.`)) {
+                return;
+            }
+            
+            toastr.info('Regenerando níveis problemáticos...');
+            
+            $.post('/Admin/RegenerateProblematicLevels')
+                .done(function(response) {
+                    if (response.success) {
+                        toastr.success(response.message);
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        toastr.error(response.message || 'Erro ao regenerar níveis');
+                    }
+                })
+                .fail(function() {
+                    toastr.error('Erro de comunicação com o servidor');
+                });
+        }
+        
+        function regenerateAll() {
+            if (!confirm('⚠️ ATENÇÃO: Isso regenerará TODOS os 50 níveis e DELETARÁ TODOS os jogos salvos. Continuar?')) {
+                return;
+            }
+            
+            if (!confirm('Esta ação é IRREVERSÍVEL. Tem CERTEZA ABSOLUTA?')) {
+                return;
+            }
+            
+            toastr.warning('Regenerando todos os níveis... Isso pode demorar alguns segundos.');
+            
+            $.post('/Admin/RegenerateAllLevels')
+                .done(function(response) {
+                    if (response.success) {
+                        toastr.success(response.message);
+                        setTimeout(() => location.reload(), 2000);
+                    } else {
+                        toastr.error(response.message || 'Erro ao regenerar níveis');
+                    }
+                })
+                .fail(function() {
+                    toastr.error('Erro de comunicação com o servidor');
+                });
+        }
+        
+        function testLevels() {
+            // Abrir níveis 1-10 em novas abas para teste
+            if (confirm('Isso abrirá os níveis 1-10 em novas abas para teste. Continuar?')) {
+                for (let i = 1; i <= 10; i++) {
+                    setTimeout(() => {
+                        window.open(`/Game/PlayLevel?levelNumber=${i}`, `_blank_level_${i}`);
+                    }, i * 200); // Delay para não sobrecarregar
+                }
+            }
+        }
+    </script>
+}
