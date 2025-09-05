@@ -398,8 +398,46 @@ namespace JogoBolinha.Services
                 _gameStateCache[gameStateId] = (gameState, DateTime.UtcNow);
                 Console.WriteLine($"[CACHE STORED] Cached game state for gameStateId: {gameStateId}");
             }
-
+            
             return gameState;
+        }
+        
+        /// <summary>
+        /// Gets a game state and verifies that the specified player has access to it
+        /// </summary>
+        /// <param name="gameStateId">The ID of the game state to retrieve</param>
+        /// <param name="playerId">The ID of the player requesting access</param>
+        /// <returns>The game state if authorized, null otherwise</returns>
+        public async Task<GameState?> GetAuthorizedGameStateAsync(int gameStateId, int? playerId)
+        {
+            Console.WriteLine($"[AUTH CHECK] Verifying authorization for gameStateId: {gameStateId}, playerId: {playerId}");
+            
+            var gameState = await GetGameStateAsync(gameStateId);
+            
+            // If game state doesn't exist, return null
+            if (gameState == null)
+            {
+                Console.WriteLine($"[AUTH FAIL] Game state {gameStateId} not found");
+                return null;
+            }
+            
+            // If no player ID is provided (anonymous user) and the game state has no owner, allow access
+            if (playerId == null && !gameState.PlayerId.HasValue)
+            {
+                Console.WriteLine($"[AUTH SUCCESS] Anonymous access granted to unowned game state {gameStateId}");
+                return gameState;
+            }
+            
+            // If player ID matches the game state owner, allow access
+            if (playerId.HasValue && playerId.Value == gameState.PlayerId)
+            {
+                Console.WriteLine($"[AUTH SUCCESS] Access granted to owner for game state {gameStateId}");
+                return gameState;
+            }
+            
+            // In all other cases, deny access
+             Console.WriteLine($"[AUTH FAIL] Access denied for playerId: {playerId} to game state {gameStateId}");
+             return null;
         }
 
         /// <summary>

@@ -43,7 +43,7 @@ public class HomeController : Controller
                 var savedGames = await _context.GameStates
                     .Include(gs => gs.Level)
                     .Include(gs => gs.Tubes)
-                        .ThenInclude(t => t.Balls.OrderBy(b => b.Position))
+                        .ThenInclude(t => t.Balls)
                     .Where(gs => gs.PlayerId == playerId && gs.Status == Models.Game.GameStatus.InProgress)
                     .OrderByDescending(gs => gs.LastModified ?? gs.StartTime)
                     .Take(5)

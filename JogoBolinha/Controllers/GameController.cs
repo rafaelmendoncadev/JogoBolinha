@@ -104,12 +104,7 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> Continue(int gameStateId)
         {
             var playerId = GetCurrentPlayerId();
-            var gameState = await _context.GameStates
-                .Include(gs => gs.Level)
-                .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
-                .Include(gs => gs.Moves)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-                
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId, includeDetails: true);
             if (gameState == null)
                 return NotFound();
                 
@@ -121,9 +116,7 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> MakeMove(int gameStateId, int fromTubeId, int toTubeId)
         {
             var playerId = GetCurrentPlayerId();
-            var gameState = await _context.GameStates
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-            
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId);
             if (gameState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
@@ -198,10 +191,8 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> UndoMove(int gameStateId)
         {
             var playerId = GetCurrentPlayerId();
-            var gameStateExists = await _context.GameStates
-                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-            
-            if (!gameStateExists)
+            var authState = await _gameStateManager.GetAuthorizedGameStateAsync(gameStateId, playerId);
+            if (authState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
             var success = await _gameLogicService.UndoMoveAsync(gameStateId);
@@ -214,11 +205,7 @@ namespace JogoBolinha.Controllers
             // Invalidate cache after undo
             _gameStateManager.InvalidateGameStateCache(gameStateId);
 
-            var gameState = await _context.GameStates
-                .Include(gs => gs.Level)
-                .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
-
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId, includeDetails: true);
             var result = new
             {
                 success = true,
@@ -248,10 +235,8 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> GetHint(int gameStateId, string hintType = "simple")
         {
             var playerId = GetCurrentPlayerId();
-            var gameStateExists = await _context.GameStates
-                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-            
-            if (!gameStateExists)
+            var authState = await _gameStateManager.GetAuthorizedGameStateAsync(gameStateId, playerId);
+            if (authState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
             var type = hintType.ToLower() switch
@@ -283,10 +268,7 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> AutoSave(int gameStateId)
         {
             var playerId = GetCurrentPlayerId();
-            var gameState = await _context.GameStates
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && 
-                                        (playerId == null || gs.PlayerId == playerId));
-            
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId);
             if (gameState != null)
             {
                 gameState.LastModified = DateTime.UtcNow;
@@ -301,10 +283,8 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> UndoMultipleMoves(int gameStateId, int movesToUndo = 1)
         {
             var playerId = GetCurrentPlayerId();
-            var gameStateExists = await _context.GameStates
-                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-            
-            if (!gameStateExists)
+            var authState = await _gameStateManager.GetAuthorizedGameStateAsync(gameStateId, playerId);
+            if (authState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
             var success = await _gameLogicService.UndoMultipleMovesAsync(gameStateId, movesToUndo);
@@ -317,11 +297,7 @@ namespace JogoBolinha.Controllers
             // Invalidate cache after multiple undo
             _gameStateManager.InvalidateGameStateCache(gameStateId);
 
-            var gameState = await _context.GameStates
-                .Include(gs => gs.Level)
-                .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
-
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId, includeDetails: true);
             var result = new
             {
                 success = true,
@@ -351,10 +327,8 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> RedoMove(int gameStateId, int movesToRedo = 1)
         {
             var playerId = GetCurrentPlayerId();
-            var gameStateExists = await _context.GameStates
-                .AnyAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-            
-            if (!gameStateExists)
+            var authState = await _gameStateManager.GetAuthorizedGameStateAsync(gameStateId, playerId);
+            if (authState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
             var success = await _gameLogicService.RedoMoveAsync(gameStateId, movesToRedo);
@@ -364,11 +338,7 @@ namespace JogoBolinha.Controllers
                 return Json(new { success = false, message = "Não é possível refazer os movimentos" });
             }
 
-            var gameState = await _context.GameStates
-                .Include(gs => gs.Level)
-                .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId);
-
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId, includeDetails: true);
             // Check game state after redo
             var stateCheck = await _gameStateManager.CheckGameStateAsync(gameStateId);
             
@@ -455,10 +425,7 @@ namespace JogoBolinha.Controllers
         public async Task<IActionResult> RestartLevel(int gameStateId)
         {
             var playerId = GetCurrentPlayerId();
-            var gameState = await _context.GameStates
-                .Include(gs => gs.Level)
-                .FirstOrDefaultAsync(gs => gs.Id == gameStateId && (playerId == null || gs.PlayerId == playerId));
-                
+            var gameState = await GetAuthorizedGameStateAsync(gameStateId, playerId, includeDetails: true);
             if (gameState == null)
                 return Json(new { success = false, message = "Jogo não encontrado" });
 
@@ -472,6 +439,59 @@ namespace JogoBolinha.Controllers
                 return Json(new { success = false, message = "Erro ao criar novo jogo" });
             
             return Json(new { success = true, newGameStateId = newGameState.Id });
+        }
+
+        // Salvar explicitamente (alias do AutoSave)
+        [HttpPost]
+        public async Task<IActionResult> SaveGame(int gameStateId)
+        {
+            var playerId = GetCurrentPlayerId();
+            var gameState = await _context.GameStates.FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+            if (gameState == null) return Json(new { success = false, message = "Jogo não encontrado" });
+            if (gameState.PlayerId.HasValue && playerId.HasValue && gameState.PlayerId != playerId.Value)
+                return Json(new { success = false, message = "Não autorizado" });
+
+            if (!gameState.PlayerId.HasValue && playerId.HasValue)
+                gameState.PlayerId = playerId.Value; // adoção
+
+            gameState.LastModified = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            return Json(new { success = true, timestamp = gameState.LastModified });
+        }
+
+        // Listar jogos salvos do usuário logado
+        [HttpGet]
+        public async Task<IActionResult> ListSavedGames(int page = 1, int pageSize = 10)
+        {
+            var playerId = GetCurrentPlayerId();
+            if (!playerId.HasValue)
+                return Json(new { success = false, message = "Usuário não autenticado" });
+
+            page = Math.Max(1, page);
+            pageSize = Math.Min(Math.Max(1, pageSize), 50);
+
+            var query = _context.GameStates
+                .Include(gs => gs.Level)
+                .Where(gs => gs.PlayerId == playerId && gs.Status == GameStatus.InProgress)
+                .OrderByDescending(gs => gs.LastModified ?? gs.StartTime);
+
+            var total = await query.CountAsync();
+            var items = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            return Json(new
+            {
+                success = true,
+                total,
+                page,
+                pageSize,
+                games = items.Select(gs => new
+                {
+                    id = gs.Id,
+                    levelNumber = gs.Level.Number,
+                    moves = gs.MovesCount,
+                    lastActivity = (gs.LastModified ?? gs.StartTime).ToString("o")
+                })
+            });
         }
 
         private GameViewModel CreateGameViewModel(GameState? gameState)
@@ -490,6 +510,38 @@ namespace JogoBolinha.Controllers
                 RemainingHints = 3 - gameState.HintsUsed,
                 RemainingAdvancedHints = 1 - (gameState.HintsUsed > 3 ? gameState.HintsUsed - 3 : 0)
             };
+        }
+
+        private async Task<GameState?> GetAuthorizedGameStateAsync(int gameStateId, int? playerId, bool includeDetails = false)
+        {
+            IQueryable<GameState> q = _context.GameStates;
+            if (includeDetails)
+            {
+                q = q.Include(gs => gs.Level)
+                     .Include(gs => gs.Tubes).ThenInclude(t => t.Balls)
+                     .Include(gs => gs.Moves);
+            }
+            var gs = await q.FirstOrDefaultAsync(gs => gs.Id == gameStateId);
+            if (gs == null) return null;
+
+            if (gs.PlayerId.HasValue && playerId.HasValue && gs.PlayerId.Value != playerId.Value)
+                return null; // não é o dono
+
+            if (!gs.PlayerId.HasValue && playerId.HasValue)
+            {
+                gs.PlayerId = playerId.Value; // adoção
+                await _context.SaveChangesAsync();
+            }
+            return gs;
+        }
+
+        private async Task EnsureOwnershipAsync(GameState? gameState, int? playerId)
+        {
+            if (gameState != null && !gameState.PlayerId.HasValue && playerId.HasValue)
+            {
+                gameState.PlayerId = playerId.Value;
+                await _context.SaveChangesAsync();
+            }
         }
 
         private async Task<GameState?> CreateNewGameStateAsync(Level? level, int? playerId = null)
@@ -672,3 +724,12 @@ namespace JogoBolinha.Controllers
         };
     }
 }
+
+
+
+
+
+
+
+
+

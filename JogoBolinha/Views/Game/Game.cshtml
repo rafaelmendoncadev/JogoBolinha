@@ -122,6 +122,12 @@
         <button class="btn btn-outline-secondary btn-effect" id="keyboard-help-btn" title="Mostrar atalhos do teclado">
             <i class="fas fa-keyboard"></i>
         </button>
+        <button class="btn btn-outline-success" id="save-btn" title="Salvar jogo agora">
+            <i class="fas fa-save"></i> Salvar
+        </button>
+        <button class="btn btn-outline-info" id="load-btn" title="Carregar jogo salvo">
+            <i class="fas fa-folder-open"></i> Carregar
+        </button>
     </div>
     
     <!-- Theme Selector -->
@@ -323,6 +329,26 @@
     </div>
 </div>
 
+<!-- Load Game Modal -->
+<div class="modal fade" id="load-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-secondary text-white">
+                <h5 class="modal-title"><i class="fas fa-folder-open"></i> Jogos Salvos</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="saved-games-list">
+                    <div class="text-center text-muted">Carregando...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <!-- Phase 4: Enable all effects and themes -->
     <script src="~/js/performance-optimizer.js"></script>
@@ -333,6 +359,11 @@
         let selectedTube = null;
         let isMoving = false;
         let gameTimer;
+
+        // AutoSave functionality - saves game state every 30 seconds
+        setInterval(() => {
+          $.post('@Url.Action("AutoSave", "Game")', { gameStateId: gameStateId });
+        }, 30000);
 
         $(document).ready(function() {
             try {
@@ -433,6 +464,42 @@
             $('#score-breakdown-btn').on('click', showScoreBreakdown);
             $('#restart-victory-btn').on('click', restartGame);
             $('#restart-lost-btn').on('click', restartGame);
+            
+            // Save/Load button handlers
+            $('#save-btn').on('click', function() {
+                $.post('@Url.Action("SaveGame", "Game")', { gameStateId: gameStateId })
+                    .done(function(resp){
+                        if (resp.success) {
+                            showMessage('Jogo salvo!', 'success');
+                        } else {
+                            showMessage(resp.message || 'Falha ao salvar', 'error');
+                        }
+                    })
+                    .fail(function(){ showMessage('Erro de conexão ao salvar', 'error'); });
+            });
+
+            $('#load-btn').on('click', function() {
+                $('#load-modal').modal('show');
+                $('#saved-games-list').html('<div class="text-center text-muted">Carregando...</div>');
+                $.get('@Url.Action("ListSavedGames", "Game")')
+                    .done(function(resp){
+                        if (!resp.success) { $('#saved-games-list').html('<div class="text-danger">' + (resp.message||'Erro') + '</div>'); return; }
+                        if (!resp.games || resp.games.length === 0) { $('#saved-games-list').html('<div class="text-muted">Nenhum jogo salvo.</div>'); return; }
+                        const baseUrl = '@Url.Action("Continue", "Game")';
+                        const html = resp.games.map(g => 
+                            '<div class="d-flex justify-content-between align-items-center border rounded p-2 mb-2">' +
+                                '<div>' +
+                                    '<div><strong>Nível:</strong> ' + g.levelNumber + '</div>' +
+                                    '<small class="text-muted">Movimentos: ' + g.moves + ' • Última atividade: ' + new Date(g.lastActivity).toLocaleString() + '</small>' +
+                                '</div>' +
+                                '<a class="btn btn-sm btn-primary" href="' + baseUrl + '?gameStateId=' + g.id + '">' +
+                                    '<i class="fas fa-play"></i> Carregar' +
+                                '</a>' +
+                            '</div>').join('');
+                        $('#saved-games-list').html(html);
+                    })
+                    .fail(function(){ $('#saved-games-list').html('<div class="text-danger">Erro de conexão</div>'); });
+            });
         }
         
         function initializeEffectsControls() {
@@ -1175,25 +1242,25 @@
         .game-container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: var(--spacing-lg);
+            font-family: var(--font-family);
             contain: layout style paint;
         }
 
         .game-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-card);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            padding: var(--spacing-lg);
+            border-radius: var(--radius);
+            margin-bottom: var(--spacing-lg);
+            box-shadow: var(--shadow-1);
         }
 
         .game-info {
             display: flex;
             justify-content: space-around;
             flex-wrap: wrap;
-            gap: 15px;
+            gap: var(--spacing-md);
         }
 
         .info-item {
@@ -1205,24 +1272,26 @@
             display: block;
             font-size: 0.9rem;
             opacity: 0.9;
-            margin-bottom: 5px;
+            margin-bottom: var(--spacing-xs);
+            font-weight: var(--font-weight-medium);
         }
 
         .info-item .value {
             display: block;
             font-size: 1.5rem;
-            font-weight: bold;
+            font-weight: var(--font-weight-bold);
         }
 
         .game-area {
-            background: #f8f9fa;
-            border-radius: 15px;
-            padding: 30px 20px;
-            margin-bottom: 20px;
+            background: var(--game-area-bg);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl) var(--spacing-lg);
+            margin-bottom: var(--spacing-lg);
             min-height: 400px;
             display: flex;
             justify-content: center;
             align-items: center;
+            transition: background-color var(--transition-normal);
         }
 
         .tubes-container {
@@ -1382,26 +1451,27 @@
         .game-controls {
             display: flex;
             justify-content: center;
-            gap: 15px;
-            margin-bottom: 20px;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
             flex-wrap: wrap;
         }
 
         .game-controls .btn {
             min-width: 120px;
-            padding: 12px 20px;
-            font-weight: 600;
-            border-radius: 25px;
-            transition: all 0.3s ease;
+            padding: var(--spacing-sm) var(--spacing-lg);
+            font-weight: var(--font-weight-medium);
+            border-radius: var(--radius);
+            transition: all var(--transition-fast);
+            box-shadow: 0 2px 4px rgba(0,0,0,.1);
         }
 
         .game-controls .btn:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            box-shadow: var(--shadow-1);
         }
         
         .btn-purple {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--gradient-card);
             color: white;
             border: none;
         }
@@ -1409,13 +1479,15 @@
         .btn-purple:hover {
             background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
             color: white;
+            transform: translateY(-2px);
         }
 
         .game-footer {
             display: flex;
             justify-content: center;
-            gap: 15px;
+            gap: var(--spacing-md);
             flex-wrap: wrap;
+            margin-top: var(--spacing-lg);
         }
 
         .victory-stats {
